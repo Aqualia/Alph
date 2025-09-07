@@ -1,4 +1,4 @@
-import { dirname, join, resolve } from 'path';
+import { dirname, resolve } from 'path';
 import { AgentProvider, AgentConfig, RemovalConfig } from './provider';
 import { ClaudeConfig } from '../types/config';
 import { BackupInfo } from '../utils/backup';
@@ -469,12 +469,14 @@ export class ClaudeProvider implements AgentProvider {
       // If projects exists, perform light validation of project-level structures
       if (config.projects) {
         if (typeof config.projects !== 'object') return false;
-        for (const [, proj] of Object.entries(config.projects)) {
+        for (const [, projRaw] of Object.entries(config.projects as Record<string, any>)) {
+          const proj = projRaw as any;
           if (proj && typeof proj === 'object' && 'mcpServers' in proj) {
-            const ps: any = (proj as any).mcpServers;
+            const ps = proj.mcpServers as any;
             if (ps && typeof ps !== 'object') return false;
             if (ps) {
-              for (const [, pServer] of Object.entries(ps)) {
+              for (const [, pServerRaw] of Object.entries(ps as Record<string, any>)) {
+                const pServer = pServerRaw as any;
                 if (typeof pServer !== 'object' || pServer === null) return false;
                 if (pServer.command && typeof pServer.command !== 'string') return false;
                 if (pServer.args && !Array.isArray(pServer.args)) return false;
