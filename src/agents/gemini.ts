@@ -394,71 +394,25 @@ export class GeminiProvider implements AgentProvider {
    * @param config - MCP server configuration to inject
    * @returns Modified Gemini configuration
    */
-  private injectMCPServerConfig(geminiConfig: GeminiConfig, config: AgentConfig): GeminiConfig {
-    // Create a copy of the configuration to avoid mutations
+  private async injectMCPServerConfig(geminiConfig: GeminiConfig, config: AgentConfig): Promise<GeminiConfig> {
     const modifiedConfig: GeminiConfig = { ...geminiConfig };
-
-    // Initialize mcpServers section if it doesn't exist
-    if (!modifiedConfig.mcpServers) {
-      modifiedConfig.mcpServers = {};
-    }
-
-    // Prepare env as-is (no header folding into env)
-    const envVars: Record<string, string> | undefined = (config.env && Object.keys(config.env).length > 0) ? { ...config.env } : undefined;
-
-    // Build server configuration based on transport, per Gemini docs
-    const transport = config.transport || 'http';
-    const serverConfig: Exclude<GeminiConfig['mcpServers'], undefined>[string] = {} as any;
-
-    // Transport field: include only when provided and not default 'http'
-    if (config.transport && config.transport !== 'http') {
-      (serverConfig as any).transport = config.transport;
-    }
-
-    // stdio: command/args/cwd
-    if (transport === 'stdio') {
-      if (config.command) {
-        (serverConfig as any).command = config.command;
-      }
-      if (config.args) {
-        (serverConfig as any).args = config.args;
-      }
-      if (config.cwd) {
-        (serverConfig as any).cwd = config.cwd;
-      }
-    }
-
-    // HTTP: httpUrl + headers
-    if (transport === 'http') {
-      if (config.mcpServerUrl) {
-        (serverConfig as any).httpUrl = config.mcpServerUrl;
-      }
-      if (config.headers && Object.keys(config.headers).length > 0) {
-        (serverConfig as any).headers = { ...config.headers };
-      }
-    }
-
-    // SSE: url + headers
-    if (transport === 'sse') {
-      if (config.mcpServerUrl) {
-        (serverConfig as any).url = config.mcpServerUrl;
-      }
-      if (config.headers && Object.keys(config.headers).length > 0) {
-        (serverConfig as any).headers = { ...config.headers };
-      }
-    }
-
-    // Common: env, timeout
-    if (envVars) {
-      (serverConfig as any).env = envVars;
-    }
-    if (config.timeout && typeof config.timeout === 'number') {
-      (serverConfig as any).timeout = config.timeout;
-    }
-
-    // Inject the server configuration
-    modifiedConfig.mcpServers[config.mcpServerId] = serverConfig;
-
+    if (!modifiedConfig.mcpServers) modifiedConfig.mcpServers = {};
+    const { renderMcpServer } = await import('../renderers/mcp.js');
+    const input: any = {
+      agent: 'gemini',
+      serverId: config.mcpServerId,
+      transport: (config.transport as any) || 'http',
+      headers: config.headers,
+      command: config.command,
+      args: config.args,
+      cwd: config.cwd,
+      env: config.env,
+      timeout: config.timeout
+    };
+    if (config.mcpServerUrl) input.url = config.mcpServerUrl;
+    const rendered = renderMcpServer(input);
+    const serverEntry = (rendered as any)['mcpServers'][config.mcpServerId];
+    modifiedConfig.mcpServers[config.mcpServerId] = serverEntry as any;
     return modifiedConfig;
   }
 

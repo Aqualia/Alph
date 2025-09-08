@@ -65,6 +65,9 @@ alph setup [options]
       --env <list>                  Environment variables (key=value pairs)
       --headers <list>              HTTP headers (key=value pairs)
       --timeout <ms>                Command execution timeout in milliseconds
+      --install-manager <mgr>       Preferred installer for STDIO tools (npm|brew|pipx|cargo|auto)
+      --atomic-mode <mode>          Atomic write strategy (auto|copy|rename)
+      --no-install                  Do not auto-install missing STDIO tools (opt-out)
       --agents <list>               Comma-separated agent names
       --dir <path>                  Custom config directory
       --dry-run                     Preview changes without writing
@@ -123,6 +126,30 @@ alph remove --server-name your-server-name --dry-run
 
 # Remove server without creating a backup (use with caution)
 alph remove --server-name your-server-name --no-backup -y
+
+## STDIO Local Tools (Default-Enabled)
+
+When selecting STDIO transport, Alph will:
+- Detect the selected local MCP tool; if missing, install it by default (echoing commands)
+- Run health checks (e.g., `--version`, `--help`) and abort if they fail
+- Proceed to write config only after health success
+
+Flags and env:
+- `--no-install` or `ALPH_NO_INSTALL=1` to skip automatic install
+- `--install-manager <npm|brew|pipx|cargo|auto>` to prefer an installer (env: `ALPH_INSTALL_MANAGER`)
+- `--atomic-mode <auto|copy|rename>` to influence atomic I/O (env: `ALPH_ATOMIC_MODE`)
+
+## Protocol Shapes (Rendered)
+
+Cursor
+- STDIO: command/args/env
+- SSE: `type: "sse"`, `url`, `headers`
+- HTTP: `type: "http"`, `url`, `headers`
+
+Gemini
+- STDIO: `transport: "stdio"`, `command`, `args?`, `cwd?`, `env?`, `timeout?`
+- SSE: `transport: "sse"`, `url`, `headers?`, `env?`, `timeout?`
+- HTTP: `httpUrl`, `headers?`, `env?`, `timeout?`
 ```
 
 ## Common Use Cases

@@ -242,7 +242,8 @@ export class InteractiveConfigurator {
         prefix: '📡 ',
         choices: [
           { name: 'HTTP (Standard)', value: 'http' },
-          { name: 'SSE (Server-Sent Events)', value: 'sse' }
+          { name: 'SSE (Server-Sent Events)', value: 'sse' },
+          { name: 'STDIO (Local command)', value: 'stdio' }
         ],
         // Default transport
         default: this.options.transport || 'http'
@@ -269,19 +270,61 @@ export class InteractiveConfigurator {
       this.options.bearer = answers['bearer'];
     }
 
-    // Ensure HTTPS prefix is added to the URL if missing
-    let httpUrl = this.options.mcpServerEndpoint || answers['httpUrl'];
-    if (httpUrl && !httpUrl.startsWith('http://') && !httpUrl.startsWith('https://')) {
-      httpUrl = `https://${httpUrl}`;
+    if (answers['transport'] === 'stdio') {
+      // STDIO flow: pick tool, ensure installed, health check, set command/args
+      const { loadToolsCatalog, detectTool, installTool, runHealthCheck, chooseDefaultInvocation } = await import('../utils/tools.js');
+      const catalog = loadToolsCatalog();
+      if (!catalog.tools || catalog.tools.length === 0) {
+        throw new Error('No STDIO tools found in catalog');
+      }
+      const { toolId } = await inquirer.prompt({
+        type: 'list',
+        name: 'toolId',
+        message: 'Select a local MCP server tool to use:',
+        choices: catalog.tools.map(t => ({ name: t.id, value: t.id })),
+        prefix: '🧰 '
+      });
+      const tool = catalog.tools.find(t => t.id === toolId)!;
+      let det = detectTool(tool);
+      if (!det.installed) {
+        const optOut = (this.options as any)['noInstall'] === true || process.env['ALPH_NO_INSTALL'] === '1';
+        if (optOut) {
+          console.log('\n⚠️  STDIO tool not found and installation is disabled (--no-install or ALPH_NO_INSTALL=1).');
+          throw new Error('Aborting: STDIO tool is not installed. Re-run without --no-install to install automatically.');
+        }
+        await installTool(tool, (this.options as any)['installManager']);
+        det = detectTool(tool);
+        if (!det.installed) {
+          throw new Error('STDIO tool installation appears to have failed; command not found after install.');
+        }
+      }
+      const health = runHealthCheck(tool);
+      if (!health.ok) {
+        throw new Error(`STDIO tool health check failed: ${health.message || 'unknown error'}`);
+      }
+      const invoke = chooseDefaultInvocation(tool, det);
+      return {
+        name: answers['name'],
+        command: invoke.command,
+        args: invoke.args,
+        transport: 'stdio',
+        disabled: false,
+        autoApprove: []
+      };
+    } else {
+      // Ensure HTTPS prefix is added to the URL if missing
+      let httpUrl = this.options.mcpServerEndpoint || answers['httpUrl'];
+      if (httpUrl && !httpUrl.startsWith('http://') && !httpUrl.startsWith('https://')) {
+        httpUrl = `https://${httpUrl}`;
+      }
+      return {
+        name: answers['name'],
+        httpUrl: httpUrl,
+        transport: answers['transport'],
+        disabled: false,
+        autoApprove: []
+      };
     }
-
-    return {
-      name: answers['name'],
-      httpUrl: httpUrl,
-      transport: answers['transport'],
-      disabled: false,
-      autoApprove: []
-    };
   }
 
   /**

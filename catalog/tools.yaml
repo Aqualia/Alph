@@ -1,0 +1,20 @@
+# Minimal examples; extend per tool
+tools:
+  - id: "github-mcp"
+    bin: "github-mcp"
+    discovery:
+      commands: ["github-mcp", "npx -y @modelcontextprotocol/github-mcp"]
+    installers:
+      macos:
+        - type: npm
+          command: "npm i -g @modelcontextprotocol/github-mcp"
+      linux:
+        - type: npm
+          command: "npm i -g @modelcontextprotocol/github-mcp"
+      windows:
+        - type: npm
+          command: "npm i -g @modelcontextprotocol/github-mcp"
+    health:
+      version: { command: "github-mcp --version" }
+      probe:   { command: "github-mcp --help" }
+

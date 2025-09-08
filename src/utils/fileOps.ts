@@ -7,6 +7,22 @@ import { randomBytes } from 'crypto';
  * Provides safe file I/O operations for configuration management
  */
 export class FileOperations {
+  /** Normalize and optionally add Windows long-path prefix */
+  private static resolvePath(p: string): string {
+    const resolved = resolve(p);
+    if (process.platform === 'win32') {
+      // If long path support is enabled via env and path is long, prefix with \\?\
+      const enableLong = process.env['ALPH_LONG_PATHS'] === '1';
+      const alreadyPrefixed = resolved.startsWith('\\\\?\\');
+      if (enableLong && !alreadyPrefixed) {
+        // Only prefix absolute paths like C:\ or \\server\share
+        if (/^[a-zA-Z]:\\/.test(resolved) || resolved.startsWith('\\\\')) {
+          return `\\\\?\\${resolved}`;
+        }
+      }
+    }
+    return resolved;
+  }
   /**
    * Reads and parses a JSON file
    * @param path - Path to the JSON file
@@ -15,7 +31,7 @@ export class FileOperations {
    */
   static async readJsonFile<T>(path: string): Promise<T> {
     try {
-      const resolved = resolve(path);
+      const resolved = this.resolvePath(path);
       const t0 = Date.now();
       const content = await this.withTimeout(
         fs.readFile(resolved, 'utf-8'),
@@ -35,6 +51,10 @@ export class FileOperations {
         if (error instanceof SyntaxError) {
           throw new Error(`Invalid JSON in file: ${path} - ${error.message}`);
         }
+      }
+      // Enhance Windows long-path guidance
+      if ((error as any)?.code === 'ENAMETOOLONG' && process.platform === 'win32') {
+        throw new Error(`Failed to read JSON file ${path}: Path too long. Enable long paths or set ALPH_LONG_PATHS=1.`);
       }
       throw new Error(`Failed to read JSON file ${path}: ${error}`);
     }
@@ -63,8 +83,9 @@ export class FileOperations {
    * @throws Error if write operation fails
    */
   static async atomicWrite(path: string, content: string): Promise<void> {
-    const resolvedPath = resolve(path);
+    const resolvedPath = this.resolvePath(path);
     const tempPath = `${resolvedPath}.tmp.${randomBytes(8).toString('hex')}`;
+    const mode = (process.env['ALPH_ATOMIC_MODE'] as 'auto'|'copy'|'rename'|undefined) || 'auto';
     
     try {
       // Ensure the directory exists
@@ -81,15 +102,47 @@ export class FileOperations {
         this.debug(`atomicWrite writeFile completed in ${Date.now() - t0}ms for ${tempPath}`);
       }
       
-      // Atomic rename to target path
+      // Atomic finalize (rename or copy depending on mode)
       {
         const t0 = Date.now();
-        await this.withTimeout(
-          fs.rename(tempPath, resolvedPath),
-          this.defaultTimeout(),
-          `atomicWrite.rename:${tempPath}->${resolvedPath}`
-        );
-        this.debug(`atomicWrite rename completed in ${Date.now() - t0}ms for ${resolvedPath}`);
+        const doCopy = async () => {
+          const t1 = Date.now();
+          await this.withTimeout(
+            fs.copyFile(tempPath, resolvedPath),
+            this.defaultTimeout(),
+            `atomicWrite.copyFile:${tempPath}->${resolvedPath}`
+          );
+          try { const fh = await fs.open(resolvedPath, 'r+'); await fh.sync(); await fh.close(); } catch {}
+          this.debug(`atomicWrite copy+sync completed in ${Date.now() - t1}ms for ${resolvedPath}`);
+          try { await fs.unlink(tempPath); } catch {}
+        };
+
+        if (mode === 'copy') {
+          await doCopy();
+        } else if (mode === 'rename') {
+          await this.withTimeout(
+            fs.rename(tempPath, resolvedPath),
+            this.defaultTimeout(),
+            `atomicWrite.rename:${tempPath}->${resolvedPath}`
+          );
+          this.debug(`atomicWrite rename completed in ${Date.now() - t0}ms for ${resolvedPath}`);
+        } else {
+          try {
+            await this.withTimeout(
+              fs.rename(tempPath, resolvedPath),
+              this.defaultTimeout(),
+              `atomicWrite.rename:${tempPath}->${resolvedPath}`
+            );
+            this.debug(`atomicWrite rename completed in ${Date.now() - t0}ms for ${resolvedPath}`);
+          } catch (err) {
+            const code = (err as any)?.code;
+            if (code === 'EXDEV' || code === 'EPERM') {
+              await doCopy();
+            } else {
+              throw err;
+            }
+          }
+        }
       }
     } catch (error) {
       // Clean up temporary file if it exists
@@ -110,6 +163,9 @@ export class FileOperations {
         if ((error as NodeJS.ErrnoException).code === 'ENOSPC') {
           throw new Error(`No space left on device when writing: ${resolvedPath}`);
         }
+        if ((error as NodeJS.ErrnoException).code === 'ENAMETOOLONG' && process.platform === 'win32') {
+          throw new Error(`Path too long when writing: ${resolvedPath}. Enable Windows long-path support or set ALPH_LONG_PATHS=1.`);
+        }
       }
       throw new Error(`Failed to write file ${resolvedPath}: ${error}`);
     }
@@ -122,7 +178,7 @@ export class FileOperations {
    */
   static async ensureDirectory(path: string): Promise<void> {
     try {
-      const resolved = resolve(path);
+      const resolved = this.resolvePath(path);
       const t0 = Date.now();
       await this.withTimeout(
         fs.mkdir(resolved, { recursive: true }),
@@ -147,7 +203,7 @@ export class FileOperations {
    */
   static async fileExists(path: string): Promise<boolean> {
     try {
-      const resolved = resolve(path);
+      const resolved = this.resolvePath(path);
       await this.withTimeout(
         fs.access(resolved, fs.constants.F_OK),
         this.defaultTimeout(),
@@ -166,7 +222,7 @@ export class FileOperations {
    */
   static async isReadable(path: string): Promise<boolean> {
     try {
-      const resolved = resolve(path);
+      const resolved = this.resolvePath(path);
       await this.withTimeout(
         fs.access(resolved, fs.constants.R_OK),
         this.defaultTimeout(),
@@ -185,7 +241,7 @@ export class FileOperations {
    */
   static async isWritable(path: string): Promise<boolean> {
     try {
-      const resolved = resolve(path);
+      const resolved = this.resolvePath(path);
       await this.withTimeout(
         fs.access(resolved, fs.constants.W_OK),
         this.defaultTimeout(),
@@ -205,7 +261,7 @@ export class FileOperations {
    */
   static async getFileStats(path: string): Promise<Stats> {
     try {
-      const resolved = resolve(path);
+      const resolved = this.resolvePath(path);
       const t0 = Date.now();
       const stats = await this.withTimeout(
         fs.stat(resolved),
@@ -231,7 +287,7 @@ export class FileOperations {
    */
   static async deleteFile(path: string): Promise<void> {
     try {
-      const resolved = resolve(path);
+      const resolved = this.resolvePath(path);
       await this.withTimeout(
         fs.unlink(resolved),
         this.defaultTimeout(),

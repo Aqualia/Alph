@@ -220,8 +220,24 @@ export class RemoveCommand {
       return;
     }
 
-    // 6) Confirmation (unless --yes)
+    // 6) Preview redacted diff and confirmation (unless --yes)
     if (!this.options.yes) {
+      try {
+        const { computeRemovalPreview } = await import('../utils/preview.js');
+        console.log('\n🧪 Preview of changes (redacted):');
+        for (const entry of serversFound) {
+          const preview = await computeRemovalPreview(entry.provider, removalConfig);
+          if (!preview) continue;
+          console.log(`\n— ${entry.provider.name} (${preview.configPath})`);
+          console.log('Before (server snippet):');
+          console.log(preview.snippetBefore);
+          console.log('After (server snippet):');
+          console.log(preview.snippetAfter);
+        }
+      } catch {
+        // preview failures are non-fatal
+      }
+
       const confirmed = await this.confirm(serversFound, removalConfig);
       if (!confirmed) {
         console.log('\n❌ Removal cancelled.');

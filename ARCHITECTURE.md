@@ -16,8 +16,8 @@ This document describes the structure of the Alph CLI codebase and the primary e
     - `provider.ts`: Shared provider types and interfaces.
     - `gemini.ts`, `cursor.ts`, `claude.ts`, `generic.ts`: Provider implementations.
   - `config/`
-    - `generator.ts`: Creates provider-specific MCP entries.
-    - `installer.ts`, `manager.ts`: Utilities to apply configuration.
+    - `validator.ts`: Schema-based validation for agent and unified configs.
+    - `unifiedManager.ts`: Optional user/project-level unified config helper.
   - `utils/`
     - `safeEdit.ts`: Backup → validate → atomic write → validate → auto-rollback on failure.
     - `backup.ts`: Timestamped backups (`.bak.YYYYMMDDTHHMMSSZ`) and cleanup/list helpers.
@@ -43,7 +43,7 @@ This document describes the structure of the Alph CLI codebase and the primary e
 3. Build `AgentConfig` from `MCPServerConfig` (transport defaults to `http`).
 4. `--dry-run`: print preview including masked access key and exit.
 5. Confirm unless `-y/--yes`.
-6. Apply configuration using provider installers through the registry with automatic rollback on failure.
+6. Apply configuration using providers through the registry with automatic rollback on failure.
 
 ### Status (`src/commands/status.ts`)
 1. Parse filter; detect providers.

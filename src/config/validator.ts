@@ -1,4 +1,4 @@
-import { AgentType } from './generator';
+import { AgentType } from '../agents/types';
 import { ValidationSchema } from '../types/config';
 
 /**

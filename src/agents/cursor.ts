@@ -392,7 +392,7 @@ export class CursorProvider implements AgentProvider {
    * @param config - MCP server configuration to inject
    * @returns Modified Cursor configuration
    */
-  private injectMCPServerConfig(cursorConfig: CursorConfig, config: AgentConfig): CursorConfig {
+  private async injectMCPServerConfig(cursorConfig: CursorConfig, config: AgentConfig): Promise<CursorConfig> {
     // Create a copy of the configuration to avoid mutations
     const modifiedConfig: CursorConfig = { ...cursorConfig };
 
@@ -401,38 +401,21 @@ export class CursorProvider implements AgentProvider {
       modifiedConfig.mcpServers = {};
     }
 
-    // Build server configuration based on transport
-    const transport = config.transport || 'http';
-    let serverConfig: Exclude<CursorConfig['mcpServers'], undefined>[string];
-
-    if (transport === 'stdio') {
-      // stdio transport: use command/args/env; no URL/headers
-      serverConfig = {
-        ...(config.command ? { command: config.command } : {}),
-        ...(config.args ? { args: config.args } : {}),
-        ...(config.env ? { env: config.env } : {}),
-        transport,
-        disabled: false,
-        autoApprove: []
-      };
-    } else {
-      // http/sse transport: include url and headers, optional env
-      serverConfig = {
-        ...(config.mcpServerUrl !== undefined ? { url: config.mcpServerUrl } : {}),
-        headers: {
-          'Content-Type': 'application/json',
-          ...(config.mcpAccessKey ? { Authorization: `Bearer ${config.mcpAccessKey}` } : {}),
-          ...(config.headers || {})
-        },
-        transport,
-        disabled: false,
-        autoApprove: [],
-        ...(config.env ? { env: config.env } : {})
-      };
-    }
-
-    // Inject the server configuration
-    modifiedConfig.mcpServers[config.mcpServerId] = serverConfig;
+    // Render protocol-aware shape and inject
+    const { renderMcpServer } = await import('../renderers/mcp.js');
+    const input: any = {
+      agent: 'cursor',
+      serverId: config.mcpServerId,
+      transport: (config.transport as any) || 'http',
+      headers: config.headers,
+      command: config.command,
+      args: config.args,
+      env: config.env
+    };
+    if (config.mcpServerUrl) input.url = config.mcpServerUrl;
+    const rendered = renderMcpServer(input);
+    const serverEntry = (rendered as any)['mcpServers'][config.mcpServerId];
+    modifiedConfig.mcpServers[config.mcpServerId] = serverEntry as any;
 
     return modifiedConfig;
   }

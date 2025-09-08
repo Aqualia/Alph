@@ -82,6 +82,21 @@ alph setup \
   --dry-run
 ```
 
+### STDIO tools (default-on install)
+
+When you choose `--transport stdio` (or pick STDIO in the wizard), Alph will detect and, by default, install the selected local MCP tool if missing, then run health checks before writing any config. You can opt out:
+
+```bash
+# Disable auto-install
+alph setup --transport stdio --no-install
+
+# Prefer a specific installer
+alph setup --transport stdio --install-manager npm
+
+# Control atomic write strategy
+ALPH_ATOMIC_MODE=copy alph setup --mcp-server-endpoint https://... --agents gemini
+```
+
 ### Status
 
 ```bash
@@ -102,6 +117,9 @@ alph setup [options]
       --env <list>                  Environment variables (key=value pairs)
       --headers <list>              HTTP headers (key=value pairs)
       --timeout <ms>                Command execution timeout in milliseconds
+      --install-manager <mgr>       Preferred installer for STDIO tools (npm|brew|pipx|cargo|auto)
+      --atomic-mode <mode>          Atomic write strategy (auto|copy|rename)
+      --no-install                  Do not auto-install missing STDIO tools (opt-out)
       --agents <list>               Comma-separated agent names to filter
       --dir <path>                  Custom config directory (default: use global agent config locations)
       --dry-run                     Preview changes without writing
@@ -118,6 +136,18 @@ alph remove [options]
   -i, --interactive                 Launch interactive removal wizard
       --no-backup                   Do not create backups before removal (advanced)
 ```
+
+### Protocol rendering examples
+
+Cursor (project scope file)
+- STDIO: `{ "mcpServers": { "github": { "command": "npx", "args": ["-y","@modelcontextprotocol/github-mcp"], "env": { "GITHUB_TOKEN": "${GITHUB_TOKEN}" } } } }`
+- SSE: `{ "mcpServers": { "linear": { "type": "sse", "url": "https://mcp.linear.app/sse", "headers": { "Authorization": "Bearer ${LINEAR_TOKEN}" } } } }`
+- HTTP: `{ "mcpServers": { "notion": { "type": "http", "url": "https://mcp.notion.com/mcp", "headers": { "Authorization": "Bearer ${NOTION_TOKEN}" } } } }`
+
+Gemini (settings.json)
+- STDIO: `{ "mcpServers": { "github": { "transport": "stdio", "command": "github-mcp", "args": [], "env": {"GITHUB_TOKEN":"${GITHUB_TOKEN}"} } } }`
+- SSE: `{ "mcpServers": { "linear": { "transport": "sse", "url": "https://mcp.linear.app/sse", "headers": { "Authorization": "Bearer ${LINEAR_TOKEN}" } } } }`
+- HTTP: `{ "mcpServers": { "notion": { "httpUrl": "https://mcp.notion.com/mcp", "headers": { "Authorization": "Bearer ${NOTION_TOKEN}" } } } }`
 
 ## Why Alph?
 1. **Security**: Local-first design — no network requests and sensitive values are redacted in output.
@@ -156,5 +186,4 @@ We follow the [Contributor Covenant v2.1](./CODE_OF_CONDUCT.md). By participatin
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
-
 

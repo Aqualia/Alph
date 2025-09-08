@@ -1,0 +1,74 @@
+{
+  "$id": "https://aqualia.dev/schemas/alph/agents.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["version", "agents"],
+  "properties": {
+    "version": { "type": "integer", "enum": [1] },
+    "defaults": {
+      "type": "object",
+      "properties": {
+        "containerKey": { "type": "string" },
+        "headerPolicies": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "headerName": { "type": "string" },
+              "format": { "type": "string" }
+            },
+            "required": ["headerName", "format"]
+          }
+        }
+      }
+    },
+    "agents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "displayName", "writeMode", "scopes", "containerKey", "protocolProfiles"],
+        "properties": {
+          "id": { "type": "string" },
+          "displayName": { "type": "string" },
+          "writeMode": { "type": "string", "enum": ["file", "cli"] },
+          "scopes": {
+            "type": "object",
+            "properties": {
+              "project": { "type": ["object", "null"], "properties": { "pathTemplate": { "type": ["string", "null"] } } },
+              "user":    { "type": ["object", "null"], "properties": { "pathTemplate": { "type": ["string", "null"] } } }
+            }
+          },
+          "containerKey": { "type": "string" },
+          "protocolProfiles": {
+            "type": "object",
+            "properties": {
+              "stdio": { "$ref": "#/definitions/profile" },
+              "sse":   { "$ref": "#/definitions/profile" },
+              "http":  { "$ref": "#/definitions/profile" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "profile": {
+      "type": "object",
+      "properties": {
+        "shape": { "type": "string" },
+        "fields": {
+          "type": "object",
+          "properties": {
+            "command": { "type": "string", "enum": ["required", "optional"] },
+            "args":    { "type": "string", "enum": ["required", "optional"] },
+            "env":     { "type": "string", "enum": ["required", "optional"] },
+            "url":     { "type": "string", "enum": ["required", "optional"] },
+            "headers": { "type": "string", "enum": ["required", "optional"] }
+          }
+        },
+        "headerPolicyRef": { "type": ["string", "null"] }
+      }
+    }
+  }
+}
+

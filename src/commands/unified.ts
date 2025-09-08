@@ -62,12 +62,15 @@ export class UnifiedCommand {
       .option('--env <list>', 'Environment variables (key=value pairs)')
       .option('--headers <list>', 'HTTP headers (key=value pairs)')
       .option('--timeout <ms>', 'Command execution timeout in milliseconds')
+      .option('--install-manager <mgr>', 'Preferred installer for STDIO tools (npm|brew|pipx|cargo|auto)')
+      .option('--atomic-mode <mode>', 'Atomic write strategy (auto|copy|rename)')
+      .option('--no-install', 'Do not auto-install missing STDIO tools (opt-out)')
       .option('--agents <list>', 'Comma-separated agent names to filter')
       .option('--dir <path>', 'Custom config directory (default: use global agent config locations)')
       .option('--dry-run', 'Preview changes without writing', false)
       .option('--no-backup', 'Do not create backups before configuration (advanced)')
       .option('--name <id>', 'Name of the MCP server (optional)')
-      .action(async (opts: { mcpServerEndpoint?: string; bearer?: string; transport?: 'http'|'sse'|'stdio'; command?: string; cwd?: string; args?: string; env?: string; headers?: string; timeout?: string; agents?: string; dir?: string; dryRun?: boolean; backup?: boolean; name?: string }) => {
+      .action(async (opts: { mcpServerEndpoint?: string; bearer?: string; transport?: 'http'|'sse'|'stdio'; command?: string; cwd?: string; args?: string; env?: string; headers?: string; timeout?: string; agents?: string; dir?: string; dryRun?: boolean; backup?: boolean; name?: string; install?: boolean; installManager?: string; atomicMode?: 'auto'|'copy'|'rename' }) => {
         // If no options provided, default to interactive wizard (simplified UX)
         const hasAnyOption = opts.mcpServerEndpoint || opts.bearer || opts.transport || opts.command || opts.cwd || opts.args || opts.env || opts.headers || opts.timeout || opts.agents || opts.dir || opts.dryRun || opts.name || opts.backup === false;
         if (!hasAnyOption) {
@@ -135,6 +138,16 @@ export class UnifiedCommand {
           configureOptions.name = opts.name;
         }
         
+        if (opts.install === false) {
+          (configureOptions as any).noInstall = true;
+        }
+        if (opts.installManager) {
+          (configureOptions as any).installManager = opts.installManager as any;
+        }
+        if (opts.atomicMode) {
+          process.env['ALPH_ATOMIC_MODE'] = opts.atomicMode;
+        }
+
         await executeConfigureCommand(configureOptions);
       });
 

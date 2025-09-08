@@ -344,7 +344,7 @@ export class ClaudeProvider implements AgentProvider {
    * @param config - MCP server configuration to inject
    * @returns Modified Claude Code configuration
    */
-  private injectMCPServerConfig(claudeConfig: ClaudeConfig, config: AgentConfig): ClaudeConfig {
+  private async injectMCPServerConfig(claudeConfig: ClaudeConfig, config: AgentConfig): Promise<ClaudeConfig> {
     // Create a copy of the configuration to avoid mutations
     const modifiedConfig: ClaudeConfig = { ...claudeConfig };
 
@@ -353,44 +353,20 @@ export class ClaudeProvider implements AgentProvider {
       modifiedConfig.mcpServers = {};
     }
 
-    // Create the MCP server configuration for Claude Code format
-    const serverConfig: Exclude<ClaudeConfig['mcpServers'], undefined>[string] = {};
-
-    // Handle different transport types
-    if (config.transport === 'stdio' || config.command) {
-      // Command-based MCP server
-      if (config.command) {
-        serverConfig.command = config.command;
-      }
-      if (config.args && config.args.length > 0) {
-        serverConfig.args = config.args;
-      }
-      if (config.env && Object.keys(config.env).length > 0) {
-        serverConfig.env = config.env;
-      }
-    } else {
-      // HTTP-based MCP server
-      if (config.mcpServerUrl) {
-        serverConfig.url = config.mcpServerUrl;
-      }
-      if (config.headers && Object.keys(config.headers).length > 0) {
-        serverConfig.headers = config.headers;
-      }
-      if (config.mcpAccessKey) {
-        if (!serverConfig.headers) {
-          serverConfig.headers = {};
-        }
-        serverConfig.headers['Authorization'] = `Bearer ${config.mcpAccessKey}`;
-      }
-    }
-
-    // Set transport if specified
-    if (config.transport) {
-      serverConfig.transport = config.transport;
-    }
-
-    // Set disabled state
-    serverConfig.disabled = false;
+    // Render protocol-aware shape
+    const { renderMcpServer } = await import('../renderers/mcp.js');
+    const input: any = {
+      agent: 'claude',
+      serverId: config.mcpServerId,
+      transport: (config.transport as any) || 'http',
+      headers: config.headers,
+      command: config.command,
+      args: config.args,
+      env: config.env
+    };
+    if (config.mcpServerUrl) input.url = config.mcpServerUrl;
+    const rendered = renderMcpServer(input);
+    const serverConfig = (rendered as any)['mcpServers'][config.mcpServerId] as any;
 
     // Inject the server configuration (global)
     modifiedConfig.mcpServers[config.mcpServerId] = serverConfig;

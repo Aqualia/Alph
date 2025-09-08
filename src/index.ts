@@ -16,3 +16,4 @@ import { executeUnifiedCommand } from './commands/unified';
 export { executeUnifiedCommand } from './commands/unified';
 export { UnifiedConfigManager, createUnifiedConfigManager } from './config/unifiedManager';
 export type { UnifiedConfig, UnifiedMCPServer, UnifiedTransport, UnifiedAuthentication } from './types/unified';
+export { CatalogLoader, CatalogValidationError, defaultCatalogLoader } from './catalog/loader';

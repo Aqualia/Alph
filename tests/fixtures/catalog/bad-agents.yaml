@@ -1,0 +1,9 @@
+version: 1
+agents:
+  - id: missing-required-fields
+    displayName: Oops
+    # writeMode missing
+    # scopes missing
+    containerKey: mcpServers
+    protocolProfiles: {}
+

@@ -46,6 +46,10 @@ export interface ConfigureCommandOptions {
   timeout?: number;
   /** Whether to create backups when configuring (defaults to true) */
   backup?: boolean;
+  /** Opt out of default-on STDIO tool installation */
+  noInstall?: boolean;
+  /** Preferred installer for STDIO tools */
+  installManager?: 'npm' | 'brew' | 'pipx' | 'cargo' | 'auto';
 }
 
 /**
@@ -91,8 +95,10 @@ export class ConfigureCommand {
       args: options.args ?? [],
       env: options.env ?? {},
       headers: options.headers ?? {},
-      timeout: options.timeout ?? 0
-      , backup: options.backup ?? true
+      timeout: options.timeout ?? 0,
+      backup: options.backup ?? true,
+      noInstall: options.noInstall ?? (process.env['ALPH_NO_INSTALL'] === '1'),
+      installManager: options.installManager ?? ((process.env['ALPH_INSTALL_MANAGER'] as any) || 'auto')
     } as Required<ConfigureCommandOptions>;
   }
   
@@ -159,13 +165,20 @@ export class ConfigureCommand {
 
     // 3) Build AgentConfig for providers
     let transport = this.options.transport;
+    // Apply default header policy if bearer present
+    const computedHeaders: Record<string, string> = { ...(this.options.headers || {}) };
+    if (this.options.bearer && (transport === 'http' || transport === 'sse')) {
+      if (!computedHeaders['Authorization']) {
+        computedHeaders['Authorization'] = `Bearer ${this.options.bearer}`;
+      }
+    }
     
     const agentConfig: AgentConfig = {
       mcpServerId: (this.options.name && this.options.name.trim()) || this.extractServerId(mcpConfig.httpUrl || ''),
       mcpServerUrl: mcpConfig.httpUrl || '',
       mcpAccessKey: this.options.bearer,
       transport,
-      headers: this.options.headers,
+      headers: computedHeaders,
       env: this.options.env,
       command: this.options.command,
       args: this.options.args,
@@ -180,8 +193,27 @@ export class ConfigureCommand {
       return;
     }
 
-    // 5) Confirmation (unless --yes)
+    // 5) Preview redacted diff and confirmation (unless --yes)
     if (!this.options.yes) {
+      if ((agentConfig.transport || 'http') === 'stdio') {
+        console.log('\nℹ️  STDIO selected: tool discovery/install and health checks will be handled in a later step (EPIC C).');
+      }
+      try {
+        const { computeInstallPreview } = await import('../utils/preview.js');
+        console.log('\n🧪 Preview of changes (redacted):');
+        for (const p of detectedProviders) {
+          const preview = await computeInstallPreview(p, agentConfig);
+          if (!preview) continue;
+          console.log(`\n— ${p.name} (${preview.configPath})`);
+          console.log('Before (server snippet):');
+          console.log(preview.snippetBefore);
+          console.log('After (server snippet):');
+          console.log(preview.snippetAfter);
+        }
+      } catch {
+        // non-fatal if preview fails
+      }
+
       const confirmed = await this.confirm(agentConfig, detectedProviders.map(p => p.name));
       if (!confirmed) {
         console.log('\n❌ Configuration cancelled.');
