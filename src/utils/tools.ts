@@ -47,14 +47,30 @@ export function detectTool(tool: ToolEntry): DetectResult {
 }
 
 export function chooseDefaultInvocation(tool: ToolEntry, detected?: DetectResult): { command: string; args: string[] } {
-  // If bin is present and installed, use bin
-  if (detected?.installed && detected.command === tool.bin) {
+  // If the tool exposes a dedicated binary and it is installed, prefer it
+  const genericRunners = new Set(['npx', 'node', 'php', 'python', 'python3']);
+  if (detected?.installed && detected.command === tool.bin && !genericRunners.has(tool.bin)) {
     return { command: tool.bin, args: [] };
   }
-  // Otherwise use the first discovery command, split into tokens
-  const cmd = (tool.discovery?.commands && tool.discovery.commands.length > 0) ? tool.discovery.commands[0] : tool.bin;
-  const { command, args } = splitCommand(cmd || tool.bin);
-  return { command, args };
+
+  // Prefer a discovery command whose head is available on PATH
+  const candidates = tool.discovery?.commands ?? [];
+  for (const c of candidates) {
+    const { command, args } = splitCommand(c);
+    if (which(command)) {
+      return { command, args };
+    }
+  }
+
+  // Fallback: if bin is a generic runner, try to use the first discovery entry
+  if (genericRunners.has(tool.bin) && candidates.length > 0) {
+    const first = candidates[0] || '';
+    const { command, args } = splitCommand(first);
+    return { command, args };
+  }
+
+  // Last resort: return bin with no args
+  return { command: tool.bin, args: [] };
 }
 
 export async function installTool(tool: ToolEntry, preferred?: InstallManager): Promise<void> {

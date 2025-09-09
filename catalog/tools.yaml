@@ -17,4 +17,67 @@ tools:
     health:
       version: { command: "github-mcp --version" }
       probe:   { command: "github-mcp --help" }
+    meta:
+      notes: "GitHub integration. Requires a personal access token."
+      envPrompts:
+        - key: "GITHUB_TOKEN"
+          label: "GitHub Personal Access Token"
+          secret: true
 
+  - id: "filesystem-mcp"
+    bin: "npx"
+    discovery:
+      commands: ["npx -y @modelcontextprotocol/server-filesystem"]
+    installers:
+      macos:
+        - type: npm
+          command: "npm i -g @modelcontextprotocol/server-filesystem"
+      linux:
+        - type: npm
+          command: "npm i -g @modelcontextprotocol/server-filesystem"
+      windows:
+        - type: npm
+          command: "npm i -g @modelcontextprotocol/server-filesystem"
+    health:
+      version: { command: "npx -y @modelcontextprotocol/server-filesystem --help" }
+    meta:
+      notes: "Filesystem server; supply allowed directories as args during customization."
+
+  - id: "memory-mcp"
+    bin: "npx"
+    discovery:
+      commands: ["npx -y @modelcontextprotocol/server-memory"]
+    installers:
+      macos:
+        - type: npm
+          command: "npm i -g @modelcontextprotocol/server-memory"
+      linux:
+        - type: npm
+          command: "npm i -g @modelcontextprotocol/server-memory"
+      windows:
+        - type: npm
+          command: "npm i -g @modelcontextprotocol/server-memory"
+    health:
+      version: { command: "npx -y @modelcontextprotocol/server-memory --help" }
+    meta:
+      notes: "Ephemeral in‑memory tool server."
+
+  - id: "playwright-mcp"
+    bin: "playwright-mcp"
+    discovery:
+      commands: ["playwright-mcp", "npx -y @playwright/mcp"]
+    installers:
+      macos:
+        - type: npm
+          command: "npm i -g @playwright/mcp"
+      linux:
+        - type: npm
+          command: "npm i -g @playwright/mcp"
+      windows:
+        - type: npm
+          command: "npm i -g @playwright/mcp"
+    health:
+      version: { command: "playwright-mcp --version" }
+      probe:   { command: "playwright-mcp --help" }
+    meta:
+      notes: "Headless browser automation via Playwright."

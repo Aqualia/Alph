@@ -277,6 +277,7 @@ export class ConfigureCommand {
     console.log('  • Gemini CLI: ~/.gemini/settings.json');
     console.log('  • Cursor: Platform-specific configuration');
     console.log('  • Claude Code: Platform-specific configuration');
+    console.log('  • Codex CLI: ~/.codex/config.toml');
     console.log('\nPlease install at least one supported AI agent and try again.');
   }
   

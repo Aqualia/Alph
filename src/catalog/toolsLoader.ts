@@ -6,6 +6,8 @@ import { parse as parseYAML } from 'yaml';
 export interface ToolInstaller { type: string; command: string }
 export interface ToolHealthCmd { command: string }
 
+export interface ToolEnvPrompt { key: string; label?: string; secret?: boolean; optional?: boolean }
+
 export interface ToolEntry {
   id: string;
   bin: string;
@@ -16,6 +18,10 @@ export interface ToolEntry {
     windows?: ToolInstaller[];
   };
   health?: { version?: ToolHealthCmd; probe?: ToolHealthCmd };
+  meta?: {
+    envPrompts?: ToolEnvPrompt[];
+    notes?: string;
+  };
 }
 
 export interface ToolsCatalog {
@@ -59,4 +65,3 @@ export class ToolsCatalogLoader {
 }
 
 export const defaultToolsCatalogLoader = new ToolsCatalogLoader();
-

@@ -12,6 +12,7 @@ import { CursorProvider } from './cursor';
 import { ClaudeProvider } from './claude';
 import { WindsurfProvider } from './windsurf';
 import { WarpProvider } from './warp';
+import { CodexProvider } from './codex';
 
 /**
  * Configuration options for the agent registry
@@ -90,6 +91,8 @@ export class AgentRegistry {
     // New: Windsurf and Warp
     this.registerProvider(new WindsurfProvider());
     this.registerProvider(new WarpProvider());
+    // New: Codex CLI
+    this.registerProvider(new CodexProvider());
   }
 
   /**
@@ -945,7 +948,10 @@ export function createRegistryWithProviders(providerNames: string[]): AgentRegis
   const providerMap: Record<string, () => AgentProvider> = {
     'Gemini CLI': () => new GeminiProvider(),
     'Cursor': () => new CursorProvider(),
-    'Claude Code': () => new ClaudeProvider()
+    'Claude Code': () => new ClaudeProvider(),
+    'Codex CLI': () => new CodexProvider(),
+    'Windsurf': () => new WindsurfProvider(),
+    'Warp': () => new WarpProvider()
   };
 
   // Register requested providers

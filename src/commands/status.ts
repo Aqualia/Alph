@@ -4,6 +4,8 @@
  */
 
 import { defaultRegistry } from '../agents/registry';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const TOML = require('@iarna/toml');
 import { FileOperations } from '../utils/fileOps';
 import type { GeminiConfig, CursorConfig, ClaudeConfig, GenericConfig } from '../types/config';
 import type { ProviderDetectionResult } from '../agents/provider';
@@ -50,6 +52,33 @@ async function buildProviderStatuses(detections: ProviderDetectionResult[]): Pro
     }
 
     try {
+      // Codex CLI uses TOML at ~/.codex/config.toml
+      if (det.provider.name === 'Codex CLI') {
+        const fs = await import('fs/promises');
+        const raw = await fs.readFile(det.configPath, 'utf-8');
+        let servers: RedactedServerEntry[] = [];
+        if (raw && raw.trim().length > 0) {
+          try {
+            const parsed = TOML.parse(raw) as any;
+            const mcp = parsed?.mcp_servers;
+            if (mcp && typeof mcp === 'object') {
+              servers = Object.entries(mcp).map(([id, cfg]) => ({
+                id,
+                config: redactSensitive(cfg as Record<string, unknown>)
+              }));
+            }
+          } catch {
+            // fallthrough to generic error below
+          }
+        }
+        return <ProviderStatus>{
+          name: det.provider.name,
+          detected: true,
+          configPath: det.configPath,
+          servers
+        };
+      }
+
       const config = await FileOperations.readJsonFile<AnyConfig>(det.configPath);
       const servers = extractMCPServers(config).map(({ id, config }) => ({
         id,

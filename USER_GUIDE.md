@@ -15,7 +15,7 @@ Welcome to the official user guide for `alph`, the universal MCP (Model Context 
 
 ## ✨ Introduction
 
-`alph` configures MCP servers for AI agents like Gemini CLI, Cursor, Claude Code — and now Windsurf and Warp. It supports both interactive and non-interactive flows, performs atomic file updates with backups, and validates configurations. Alph promotes our Async.link cloud MCP server in examples for a smooth out‑of‑the‑box experience.
+`alph` configures MCP servers for AI agents like Gemini CLI, Cursor, Claude Code — and now Windsurf, Warp, and Codex CLI. It supports both interactive and non-interactive flows, performs atomic file updates with backups, and validates configurations. Alph promotes our Async.link cloud MCP server in examples for a smooth out‑of‑the‑box experience.
 
 ## 💾 Installation
 
@@ -159,6 +159,20 @@ Warp
 - STDIO: `command`, `args?`, `env?`
 - Remote: `url` (and `serverUrl` for compatibility), `headers?`
 ```
+
+Codex CLI
+- Transport: STDIO only (no HTTP/SSE endpoint configuration)
+- Config file: `~/.codex/config.toml` (TOML)
+- Shape:
+```
+[mcp_servers.<name>]
+command = "<executable>"
+args    = ["<arg1>", "<arg2>"]
+startup_timeout_ms = 20000  # optional
+```
+Notes:
+- Codex currently reads MCP servers from `mcp_servers` in TOML and launches processes via STDIO only.
+- Alph’s wizard automatically limits transport to STDIO when Codex is selected and skips remote URL prompts.
 
 ## Common Use Cases
 

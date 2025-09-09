@@ -60,7 +60,7 @@ export class InteractiveConfigurator {
     }
     
     // 3. Get MCP server configuration (supports pre-filled endpoint & access key)
-    const mcpConfig = await this.getMCPConfig();
+    const mcpConfig = await this.getMCPConfig(selectedAgents);
     if (!mcpConfig) {
       console.log('\n❌ Configuration aborted.');
       return;
@@ -141,6 +141,7 @@ export class InteractiveConfigurator {
     console.log('  • Gemini CLI: ~/.gemini/settings.json');
     console.log('  • Cursor: Platform-specific configuration');
     console.log('  • Claude Code: Platform-specific configuration');
+    console.log('  • Codex CLI: ~/.codex/config.toml');
     console.log('\n💡 To proceed, please:');
     console.log('   1. Install one of the supported AI agents listed above');
     console.log('   2. Ensure the agent is properly configured');
@@ -152,15 +153,23 @@ export class InteractiveConfigurator {
    * Gets a description for an agent
    */
   private getAgentDescription(agent: string): string {
-    const descriptions: Record<string, string> = {
-      'gemini': 'Google Gemini CLI — Command‑line access to Gemini models for coding, reasoning, and web tasks',
+    const key = (agent || '').trim().toLowerCase();
+    const descMap: Record<string, string> = {
+      // Exact provider names
+      'gemini cli': 'Google Gemini CLI — Command‑line access to Gemini models for coding, reasoning, and web tasks',
       'cursor': 'Cursor IDE — AI‑powered code editor with inline assistance and automations',
+      'claude code': 'Claude Code — Anthropic’s coding assistant for generating, explaining, and refactoring code',
+      'windsurf': 'Windsurf (Codeium) — AI IDE with MCP integration for custom tools',
+      'codex cli': 'OpenAI Codex CLI — Terminal coding assistant; MCP via STDIO (TOML at ~/.codex/config.toml)',
+      'warp': 'Warp Terminal — AI‑assisted terminal with MCP server support',
+      // Common aliases
+      'gemini': 'Google Gemini CLI — Command‑line access to Gemini models for coding, reasoning, and web tasks',
       'claude': 'Claude Code — Anthropic’s coding assistant for generating, explaining, and refactoring code',
-      'generic': 'Custom AI agent - Flexible configuration for any MCP-compatible tool',
-      'default': 'AI agent with MCP server integration support'
+      'codex': 'OpenAI Codex CLI — Terminal coding assistant; MCP via STDIO (TOML at ~/.codex/config.toml)',
+      'codeium-windsurf': 'Windsurf (Codeium) — AI IDE with MCP integration for custom tools',
+      'warp-terminal': 'Warp Terminal — AI‑assisted terminal with MCP server support'
     };
-    
-    return descriptions[agent.toLowerCase()] || descriptions['default'] || 'AI agent with MCP server integration support';
+    return descMap[key] || 'AI agent with MCP server integration support';
   }
   
   /**
@@ -195,12 +204,17 @@ export class InteractiveConfigurator {
   /**
    * Gets MCP server configuration through interactive prompts
    */
-  private async getMCPConfig(): Promise<MCPServerConfig | null> {
+  private async getMCPConfig(selectedAgents?: string[]): Promise<MCPServerConfig | null> {
     console.log('\n🌐 MCP Server Configuration');
     console.log('='.repeat(50));
     console.log('Configure your Model Context Protocol (MCP) server connection.');
     console.log('This will enable your AI agents to communicate with your MCP server.\n');
+    const includesCodex = Array.isArray(selectedAgents) && selectedAgents.includes('Codex CLI');
     
+    if (includesCodex) {
+      console.log('ℹ️  Codex CLI: Remote HTTP/SSE MCP servers are not supported.');
+      console.log('   We will configure a local STDIO MCP server (command + args).');
+    }
     const prompts: any[] = [
       {
         type: 'input',
@@ -210,7 +224,7 @@ export class InteractiveConfigurator {
         prefix: '🏷️ '
       },
       // URL prompt is conditionally included
-      ...(!this.options.mcpServerEndpoint
+      ...(!this.options.mcpServerEndpoint && !includesCodex
         ? [{
             type: 'input',
             name: 'httpUrl',
@@ -240,16 +254,18 @@ export class InteractiveConfigurator {
         name: 'transport',
         message: 'Transport Protocol:',
         prefix: '📡 ',
-        choices: [
-          { name: 'HTTP (Standard)', value: 'http' },
-          { name: 'SSE (Server-Sent Events)', value: 'sse' },
-          { name: 'STDIO (Local command)', value: 'stdio' }
-        ],
+        choices: includesCodex
+          ? [ { name: 'STDIO (Local command)', value: 'stdio' } ]
+          : [
+              { name: 'HTTP (Standard)', value: 'http' },
+              { name: 'SSE (Server-Sent Events)', value: 'sse' },
+              { name: 'STDIO (Local command)', value: 'stdio' }
+            ],
         // Default transport
-        default: this.options.transport || 'http'
+        default: includesCodex ? 'stdio' : (this.options.transport || 'http')
       },
       // Authentication token prompt is conditionally included; input masked
-      ...(!this.options.bearer
+      ...(!this.options.bearer && !includesCodex
         ? [{
             type: 'password',
             name: 'bearer',
@@ -277,13 +293,43 @@ export class InteractiveConfigurator {
       if (!catalog.tools || catalog.tools.length === 0) {
         throw new Error('No STDIO tools found in catalog');
       }
+      const customChoice = { name: 'Custom command…', value: '__custom__' } as const;
+      // Deduplicate tools by id
+      const uniqueIds = new Set<string>();
+      const uniqueTools = catalog.tools.filter(t => {
+        if (uniqueIds.has(t.id)) return false;
+        uniqueIds.add(t.id);
+        return true;
+      });
+      // Show custom at top always
+      const toolChoices = [customChoice, ...uniqueTools.map(t => ({ name: t.id, value: t.id }))];
       const { toolId } = await inquirer.prompt({
         type: 'list',
         name: 'toolId',
         message: 'Select a local MCP server tool to use:',
-        choices: catalog.tools.map(t => ({ name: t.id, value: t.id })),
+        choices: toolChoices,
+        default: (Array.isArray(selectedAgents) && selectedAgents.includes('Codex CLI')) ? customChoice.value : (toolChoices[0]?.value ?? customChoice.value),
         prefix: '🧰 '
       });
+      if (toolId === '__custom__') {
+        const custom = await inquirer.prompt([
+          { type: 'input', name: 'cmd', message: 'Command (e.g., npx):', prefix: '💻 ', validate: (s: string) => !!s || 'Command is required.' },
+          { type: 'input', name: 'args', message: 'Arguments (comma or space separated):', prefix: '➕ ', default: '' }
+        ]);
+        const args = (custom.args as string)
+          .split(/[\s,]+/)
+          .map(s => s.trim())
+          .filter(Boolean);
+        return {
+          name: answers['name'],
+          command: custom.cmd,
+          args,
+          transport: 'stdio',
+          disabled: false,
+          autoApprove: []
+        };
+      }
+
       const tool = catalog.tools.find(t => t.id === toolId)!;
       let det = detectTool(tool);
       if (!det.installed) {
@@ -298,11 +344,70 @@ export class InteractiveConfigurator {
           throw new Error('STDIO tool installation appears to have failed; command not found after install.');
         }
       }
-      const health = runHealthCheck(tool);
-      if (!health.ok) {
-        throw new Error(`STDIO tool health check failed: ${health.message || 'unknown error'}`);
+      let invoke = chooseDefaultInvocation(tool, det);
+      // Offer customization of command/args after detection
+      const { customize } = await inquirer.prompt({ type: 'confirm', name: 'customize', message: 'Customize command/args?', default: (Array.isArray(selectedAgents) && selectedAgents.includes('Codex CLI')) });
+      if (customize) {
+        const edited = await inquirer.prompt([
+          { type: 'input', name: 'cmd', message: 'Command:', prefix: '💻 ', default: invoke.command, validate: (s: string) => !!s || 'Command is required.' },
+          { type: 'input', name: 'args', message: 'Arguments (comma or space separated):', prefix: '➕ ', default: (invoke.args || []).join(' ') }
+        ]);
+        const args = (edited.args as string)
+          .split(/[\s,]+/)
+          .map(s => s.trim())
+          .filter(Boolean);
+        invoke = { command: edited.cmd, args };
+      } else {
+        // Run health check only if using dedicated binary; skip when falling back to generic runners/npx
+        const usingDedicatedBin = invoke.command === tool.bin && !['npx','node','php','python','python3'].includes(tool.bin);
+        if (usingDedicatedBin) {
+          const health = runHealthCheck(tool);
+          if (!health.ok) {
+            // Offer automatic fallback to a discovery command (e.g., npx) if available
+            const fallback = (tool.discovery?.commands || []).map(c => c).find(c => c.startsWith('npx ') || c.startsWith('node ') || c.startsWith('php '));
+            if (fallback) {
+              const { acceptFallback } = await inquirer.prompt({ type: 'confirm', name: 'acceptFallback', message: `Health check failed for '${tool.bin}'. Use fallback invocation '${fallback}' instead?`, default: true });
+              if (acceptFallback) {
+                const parts = fallback.split(' ').filter(Boolean);
+                const head = parts[0] ?? '';
+                const rest = parts.length > 1 ? parts.slice(1) : [];
+                if (!head) {
+                  throw new Error('Invalid fallback invocation');
+                }
+                invoke = { command: head, args: rest };
+              } else {
+                throw new Error(`STDIO tool health check failed: ${health.message || 'unknown error'}`);
+              }
+            } else {
+              throw new Error(`STDIO tool health check failed: ${health.message || 'unknown error'}`);
+            }
+          }
+        }
       }
-      const invoke = chooseDefaultInvocation(tool, det);
+
+      // Prompt for tool-specific env vars if defined
+      if (tool.meta?.envPrompts && Array.isArray(tool.meta.envPrompts) && tool.meta.envPrompts.length > 0) {
+        const envAnswers: Record<string, string> = {};
+        for (const e of tool.meta.envPrompts) {
+          const ans = await inquirer.prompt({
+            type: e.secret ? 'password' : 'input',
+            name: 'val',
+            message: e.label || e.key,
+            mask: e.secret ? '*' : undefined,
+            validate: (v: string) => (e.optional || (v && v.trim().length > 0)) ? true : `${e.key} is required.`
+          });
+          if (ans.val && String(ans.val).trim().length > 0) envAnswers[e.key] = String(ans.val).trim();
+        }
+        return {
+          name: answers['name'],
+          command: invoke.command,
+          args: invoke.args,
+          transport: 'stdio',
+          disabled: false,
+          autoApprove: [],
+          env: envAnswers
+        } as any;
+      }
       return {
         name: answers['name'],
         command: invoke.command,
@@ -433,16 +538,11 @@ private async applyConfiguration(
   backup?: boolean
 ): Promise<void> {
 console.log('\n🔄 Applying configuration...');
-  
-if (!mcpConfig.httpUrl) {
-  throw new Error('MCP server URL is required');
-}
-
 // Default transport
   let transport = mcpConfig.transport || 'http';
   
   const commandOptions: ConfigureCommandOptions = {
-    mcpServerEndpoint: mcpConfig.httpUrl,
+    ...(mcpConfig.httpUrl ? { mcpServerEndpoint: mcpConfig.httpUrl } : {}),
     name: mcpConfig.name, // Pass the user-provided name
     transport: transport,
     agents: agents.join(','), // Convert array to comma-separated string
@@ -451,6 +551,11 @@ if (!mcpConfig.httpUrl) {
     // Explicitly set interactive to false to prevent loop
     interactive: false
   };
+  // For STDIO flows, pass command/args to provider configuration
+  if (transport === 'stdio') {
+    (commandOptions as any).command = (mcpConfig as any).command;
+    (commandOptions as any).args = (mcpConfig as any).args;
+  }
   
   // Add optional properties only if they have values
   if (this.options.bearer !== undefined) {

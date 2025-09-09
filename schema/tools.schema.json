@@ -31,10 +31,28 @@
               "version": { "type": "object", "properties": { "command": { "type": "string" } } },
               "probe":   { "type": "object", "properties": { "command": { "type": "string" } } }
             }
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "notes": { "type": "string" },
+              "envPrompts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["key"],
+                  "properties": {
+                    "key": { "type": "string" },
+                    "label": { "type": "string" },
+                    "secret": { "type": "boolean" },
+                    "optional": { "type": "boolean" }
+                  }
+                }
+              }
+            }
           }
         }
       }
     }
   }
 }
-
