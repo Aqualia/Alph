@@ -6,6 +6,7 @@ import { FileOperations } from '../utils/fileOps';
 import { BackupManager } from '../utils/backup';
 import { SafeEditManager } from '../utils/safeEdit';
 import { AgentDetector } from './detector';
+import { resolveConfigPath } from '../catalog/adapter';
 
 /**
  * Gemini CLI provider for configuring Google's Gemini CLI tool
@@ -33,13 +34,14 @@ export class GeminiProvider implements AgentProvider {
    * @returns Default path to Gemini settings.json
    */
   protected getDefaultConfigPath(configDir?: string): string {
-    // If custom config directory is provided, use it
-    if (configDir) {
-      return join(configDir, '.gemini', 'settings.json');
-    }
-    
+    // Prefer explicit env override when set
     const envOverride = AgentDetector.getEnvOverridePath('gemini');
-    return envOverride ?? AgentDetector.getDefaultConfigPath('gemini');
+    if (envOverride) return envOverride;
+    // Prefer catalog-derived path
+    if (configDir && configDir.trim()) {
+      return resolveConfigPath('gemini', 'project', configDir) || join(configDir, '.gemini', 'settings.json');
+    }
+    return resolveConfigPath('gemini', 'user') || AgentDetector.getDefaultConfigPath('gemini');
   }
 
   /**
@@ -494,6 +496,13 @@ export class GeminiProvider implements AgentProvider {
           if (serverConfig.httpUrl && typeof serverConfig.httpUrl !== 'string') {
             return fail('httpUrl present but not a string', { serverId, httpUrl: serverConfig.httpUrl });
           }
+          // Accept alternative http 'url' when transport explicitly set to http
+          if ((serverConfig as any).transport === 'http') {
+            const altUrl = (serverConfig as any).url;
+            if (altUrl !== undefined && typeof altUrl !== 'string') {
+              return fail('http transport with non-string url', { serverId, url: altUrl });
+            }
+          }
 
           // Validate SSE url if present
           if ((serverConfig as any).url && typeof (serverConfig as any).url !== 'string') {
@@ -505,9 +514,15 @@ export class GeminiProvider implements AgentProvider {
             return fail('env present but not an object', { serverId });
           }
 
-          // Validate headers if present
+          // Validate headers if present (support generic and transport-specific keys)
           if ((serverConfig as any).headers && typeof (serverConfig as any).headers !== 'object') {
             return fail('headers present but not an object', { serverId });
+          }
+          if ((serverConfig as any).httpHeaders && typeof (serverConfig as any).httpHeaders !== 'object') {
+            return fail('httpHeaders present but not an object', { serverId });
+          }
+          if ((serverConfig as any).sseHeaders && typeof (serverConfig as any).sseHeaders !== 'object') {
+            return fail('sseHeaders present but not an object', { serverId });
           }
 
           if (serverConfig.disabled !== undefined && typeof serverConfig.disabled !== 'boolean') {
@@ -544,8 +559,9 @@ export class GeminiProvider implements AgentProvider {
           // Compare URL according to expected transport
           if (expectedMCPConfig.mcpServerUrl) {
             if (expectedMCPConfig.transport === 'http') {
-              if (serverConfig.httpUrl !== expectedMCPConfig.mcpServerUrl) {
-                return fail('expected httpUrl mismatch', { expected: expectedMCPConfig.mcpServerUrl, actual: serverConfig.httpUrl });
+              const actual = serverConfig.httpUrl || (serverConfig as any).url;
+              if (actual !== expectedMCPConfig.mcpServerUrl) {
+                return fail('expected http url mismatch', { expected: expectedMCPConfig.mcpServerUrl, actual });
               }
             } else if (expectedMCPConfig.transport === 'sse') {
               const actualUrl = (serverConfig as any).url;

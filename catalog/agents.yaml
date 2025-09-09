@@ -78,5 +78,48 @@ agents:
       http:
         shape: genericHTTP
         fields: { url: required, headers: optional }
+      headerPolicyRef: bearer
+
+  - id: windsurf
+    displayName: Windsurf
+    writeMode: file
+    scopes:
+      project:
+        pathTemplate: "${projectDir}/.codeium/windsurf/mcp_config.json"
+      user:
+        pathTemplate: "${home}/.codeium/windsurf/mcp_config.json"
+    containerKey: mcpServers
+    protocolProfiles:
+      stdio:
+        shape: claudeStdio
+        fields: { command: required, args: optional, env: optional }
+      sse:
+        shape: genericHTTP
+        fields: { url: required, headers: optional }
+        headerPolicyRef: bearer
+      http:
+        shape: genericHTTP
+        fields: { url: required, headers: optional }
         headerPolicyRef: bearer
 
+  - id: warp
+    displayName: Warp
+    writeMode: cli
+    scopes:
+      project:
+        pathTemplate: null
+      user:
+        pathTemplate: null
+    containerKey: mcpServers
+    protocolProfiles:
+      stdio:
+        shape: claudeStdio
+        fields: { command: required, args: optional, env: optional }
+      sse:
+        shape: genericHTTP
+        fields: { url: required, headers: optional }
+        headerPolicyRef: bearer
+      http:
+        shape: genericHTTP
+        fields: { url: required, headers: optional }
+        headerPolicyRef: bearer

@@ -6,6 +6,7 @@ import { FileOperations } from '../utils/fileOps';
 import { BackupManager } from '../utils/backup';
 import { SafeEditManager } from '../utils/safeEdit';
 import { AgentDetector } from './detector';
+import { resolveConfigPath } from '../catalog/adapter';
 
 /**
  * Cursor IDE provider for configuring Cursor's MCP server settings
@@ -36,10 +37,10 @@ export class CursorProvider implements AgentProvider {
    * @returns Default path to Cursor settings.json
    */
   protected getDefaultConfigPath(configDir?: string): string {
-    if (configDir) {
-      return join(configDir, '.cursor', 'mcp.json');
+    if (configDir && configDir.trim()) {
+      return resolveConfigPath('cursor', 'project', configDir) || join(configDir, '.cursor', 'mcp.json');
     }
-    return AgentDetector.getDefaultConfigPath('cursor');
+    return resolveConfigPath('cursor', 'user') || AgentDetector.getDefaultConfigPath('cursor');
   }
 
   /**
@@ -533,9 +534,13 @@ export class CursorProvider implements AgentProvider {
                 serverConfig.httpUrl !== expectedMCPConfig.mcpServerUrl) {
               return false;
             }
-            if (expectedMCPConfig.transport && serverConfig.transport !== expectedMCPConfig.transport) {
-              return false;
-            }
+          // Determine effective transport: prefer explicit transport, then 'type', then infer
+          const effectiveTransport = (serverConfig.transport as any)
+            || ((serverConfig as any).type as any)
+            || (serverConfig.command ? 'stdio' : (serverConfig.httpUrl || serverConfig.url ? 'http' : undefined));
+          if (expectedMCPConfig.transport && effectiveTransport !== expectedMCPConfig.transport) {
+            return false;
+          }
           }
         }
       }

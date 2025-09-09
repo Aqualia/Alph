@@ -41,12 +41,12 @@ export async function executeStatusCommand(_options: StatusCommandOptions = {}):
 async function buildProviderStatuses(detections: ProviderDetectionResult[]): Promise<ProviderStatus[]> {
   // Kick off parallel reads for detected ones
   const readPromises = detections.map(async (det) => {
-    if (!det.detected || !det.configPath) {
-      return <ProviderStatus>{
-        name: det.provider.name,
-        detected: false,
-        ...(det.error && { error: det.error })
-      };
+    // Providers like Warp don't have a config file path but can be detected.
+    if (!det.detected) {
+      return <ProviderStatus>{ name: det.provider.name, detected: false, ...(det.error && { error: det.error }) };
+    }
+    if (!det.configPath) {
+      return <ProviderStatus>{ name: det.provider.name, detected: true };
     }
 
     try {
@@ -139,10 +139,8 @@ function structuredCloneSafe<T>(v: T): T {
 }
 
 function printTable(statuses: ProviderStatus[]): void {
-  // eslint-disable-next-line no-console
-  console.log('\n\x1b[1mAlph MCP Configuration Status\x1b[0m');
-  // eslint-disable-next-line no-console
-  console.log('========================================\n');
+  console.log('\nAlph MCP Configuration Status');
+  console.log('----------------------------------------\n');
 
   if (statuses.length === 0) {
     // eslint-disable-next-line no-console
@@ -169,12 +167,11 @@ function printTable(statuses: ProviderStatus[]): void {
       console.log(`  Config file: ${s.configPath || 'N/A'}`);
 
       if (count > 0) {
-        // eslint-disable-next-line no-console
-        console.log('  MCP Servers:');
+    console.log('  MCP Servers:');
         for (const entry of s.servers!) {
           const c = entry.config as any;
           const url = c.httpUrl || c.url || c.endpoint || c.command || 'N/A';
-          const disabled = c.disabled === true ? '\x1b[31mdisabled\x1b[0m' : '\x1b[32menabled\x1b[0m';
+          const disabled = c.disabled === true ? 'disabled' : 'enabled';
 
           // Determine transport: prefer explicit, else infer; map stdio to N/A for display
           const explicit: string | undefined = c.transport || c.config?.transport;

@@ -29,8 +29,12 @@ This document describes the security model and practices of the Alph CLI. It is 
 
 ## Network and subprocess behavior
 
-- No network calls (e.g., `fetch`, `http`, `https`) are made by the CLI.
-- No subprocess execution (e.g., `child_process`) is used by the CLI.
+- Core CLI operations (detect, status, configure/remove file edits) perform local file I/O only and do not make network calls.
+- Interactive STDIO flow may execute installers as subprocesses to set up local MCP tools (e.g., `npm i -g @modelcontextprotocol/<tool>`). This behavior is:
+  - Enabled by default in the wizard for convenience.
+  - Fully optional — disable with `--no-install` or `ALPH_NO_INSTALL=1`.
+  - Transparent — the exact install command is echoed to the console before execution.
+- Health checks for installed tools may spawn short-lived subprocesses (e.g., `<tool> --version`).
 
 ## Environment variables
 

@@ -15,7 +15,7 @@ Welcome to the official user guide for `alph`, the universal MCP (Model Context 
 
 ## ✨ Introduction
 
-`alph` configures MCP servers for AI agents like Gemini CLI, Cursor, and Claude Code. It supports both interactive and non-interactive flows, performs atomic file updates with backups, and validates configurations. Alph promotes our Async.link cloud MCP server in examples for a smooth out‑of‑the‑box experience.
+`alph` configures MCP servers for AI agents like Gemini CLI, Cursor, Claude Code — and now Windsurf and Warp. It supports both interactive and non-interactive flows, performs atomic file updates with backups, and validates configurations. Alph promotes our Async.link cloud MCP server in examples for a smooth out‑of‑the‑box experience.
 
 ## 💾 Installation
 
@@ -150,6 +150,14 @@ Gemini
 - STDIO: `transport: "stdio"`, `command`, `args?`, `cwd?`, `env?`, `timeout?`
 - SSE: `transport: "sse"`, `url`, `headers?`, `env?`, `timeout?`
 - HTTP: `httpUrl`, `headers?`, `env?`, `timeout?`
+
+Windsurf
+- STDIO: `command`, `args?`, `env?`
+- HTTP/SSE: `serverUrl`, `headers?`, `env?`
+
+Warp
+- STDIO: `command`, `args?`, `env?`
+- Remote: `url` (and `serverUrl` for compatibility), `headers?`
 ```
 
 ## Common Use Cases

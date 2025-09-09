@@ -10,6 +10,8 @@ import { AgentProvider, AgentConfig, ProviderDetectionResult, ProviderConfigurat
 import { GeminiProvider } from './gemini';
 import { CursorProvider } from './cursor';
 import { ClaudeProvider } from './claude';
+import { WindsurfProvider } from './windsurf';
+import { WarpProvider } from './warp';
 
 /**
  * Configuration options for the agent registry
@@ -85,6 +87,9 @@ export class AgentRegistry {
     this.registerProvider(new GeminiProvider());
     this.registerProvider(new CursorProvider());
     this.registerProvider(new ClaudeProvider());
+    // New: Windsurf and Warp
+    this.registerProvider(new WindsurfProvider());
+    this.registerProvider(new WarpProvider());
   }
 
   /**

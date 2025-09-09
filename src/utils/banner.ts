@@ -66,10 +66,18 @@ export function centerText(text: string, width?: number): string {
  * @returns Formatted banner string
  */
 export async function getMainBanner(): Promise<string> {
+  // Dynamically import ESM-only chalk in CJS context
   const { default: chalk } = await import('chalk');
-  const bannerLines = ALPH_BANNER.split('\n').filter(line => line.trim().length > 0);
-  
-  return colorizeBanner(bannerLines, 'main', chalk);
+
+  const lines = ALPH_BANNER
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .split('\n')
+    .filter(l => l.trim().length > 0)
+    // Left-align banner (no centering per requested positioning)
+    .map(l => l);
+
+  return colorizeBanner(lines, 'main', chalk);
 }
 
 /**
@@ -79,9 +87,16 @@ export async function getMainBanner(): Promise<string> {
  */
 export async function getWizardBanner(): Promise<string> {
   const { default: chalk } = await import('chalk');
-  const bannerLines = WIZARD_BANNER.split('\n').filter(line => line.trim().length > 0);
-  
-  return colorizeBanner(bannerLines, 'wizard', chalk);
+
+  const terminalWidth = process.stdout.columns || 80;
+  const lines = WIZARD_BANNER
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .split('\n')
+    .filter(l => l.trim().length > 0)
+    .map(l => centerText(l, terminalWidth));
+
+  return colorizeBanner(lines, 'wizard', chalk);
 }
 
 /**
@@ -107,10 +122,9 @@ export async function showMainBanner(): Promise<void> {
   console.log(await getMainBanner());
   console.log();
   
-  // Centered description
-  const terminalWidth = process.stdout.columns || 80;
+  // Left-aligned description (avoid centering)
   const description = 'Universal Remote MCP Server Manager';
-  console.log(centerText(description, terminalWidth));
+  console.log(description);
   console.log();
 }
 

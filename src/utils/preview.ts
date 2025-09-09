@@ -56,7 +56,8 @@ function renderServerEntry(cfg: AgentConfig): Record<string, any> {
     if ((cfg as any)['headers'] && Object.keys((cfg as any)['headers']).length > 0) entry['headers'] = { ...(cfg as any)['headers'] };
   }
   if ((cfg as any)['env'] && Object.keys((cfg as any)['env']).length > 0) entry['env'] = { ...(cfg as any)['env'] };
-  if (typeof (cfg as any)['timeout'] === 'number' && Number.isFinite((cfg as any)['timeout'])) entry['timeout'] = (cfg as any)['timeout'];
+  const t = (cfg as any)['timeout'];
+  if (typeof t === 'number' && Number.isFinite(t) && t > 0) entry['timeout'] = t;
   return entry;
 }
 

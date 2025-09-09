@@ -6,6 +6,7 @@ import { FileOperations } from '../utils/fileOps';
 import { BackupManager } from '../utils/backup';
 import { SafeEditManager } from '../utils/safeEdit';
 import { AgentDetector } from './detector';
+import { resolveConfigPath } from '../catalog/adapter';
 
 /**
  * Claude Code provider for configuring Claude Code's MCP server settings
@@ -35,10 +36,8 @@ export class ClaudeProvider implements AgentProvider {
    * @returns Default path to Claude configuration file
    */
   protected getDefaultConfigPath(_configDir?: string): string {
-    // Claude Code always stores configuration in the user's home directory
-    // under ~/.claude.json. The optional configDir (project) is used only
-    // to decide which project entry to update, not where the file lives.
-    return AgentDetector.getDefaultConfigPath('claude');
+    // Prefer catalog-derived user path; fallback to detector default
+    return resolveConfigPath('claude', 'user') || AgentDetector.getDefaultConfigPath('claude');
   }
 
   /**
@@ -531,8 +530,11 @@ export class ClaudeProvider implements AgentProvider {
             }
           }
 
-          // Validate transport if specified
-          if (expectedMCPConfig.transport && serverConfig.transport !== expectedMCPConfig.transport) {
+          // Validate transport if specified (accept either 'transport' or 'type')
+          const effectiveTransport = (serverConfig.transport as any)
+            || ((serverConfig as any).type as any)
+            || (serverConfig.command ? 'stdio' : (serverConfig.url ? 'http' : undefined));
+          if (expectedMCPConfig.transport && effectiveTransport !== expectedMCPConfig.transport) {
             return false;
           }
         }

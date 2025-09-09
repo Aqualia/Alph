@@ -1,4 +1,4 @@
-<p align="center">
+ <p align="center">
   <img src="assets/alph-banner.svg" alt="ALPH banner" width="720" />
 </p>
 

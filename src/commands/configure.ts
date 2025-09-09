@@ -113,6 +113,8 @@ export class ConfigureCommand {
    */
   public async execute(): Promise<void> {
     this.validateOptions();
+    const { logger } = await import('../logger.js');
+    logger.logStructured('info', { message: 'configure:start', context: { transport: this.options.transport, agents: this.options.agents } });
 
     // Interactive path or default with no flags
     const noFlags = !this.options.mcpServerEndpoint && !this.options.bearer && !this.options.agents && !this.options.dryRun && !this.options.yes;
@@ -140,7 +142,7 @@ export class ConfigureCommand {
     
     // Only show detection message if not in interactive mode
     if (!this.options.interactive) {
-      console.log('\n🔍 Detecting available AI agents...');
+      console.log('\n[INFO] Detecting available AI agents...');
     }
     
     const detectionResults = await defaultRegistry.detectAvailableAgents(providerFilter, this.options.configDir);
@@ -149,7 +151,7 @@ export class ConfigureCommand {
       // Fallback: if the user explicitly requested agents, proceed to configure them
       // even if no existing config files were detected. Providers will create files.
       if (valid.length > 0) {
-        console.log('\nℹ️  No existing configuration files detected; will create new ones for requested agents.');
+        console.log('\n[INFO] No existing configuration files detected; will create new ones for requested agents.');
       } else {
         this.handleNoAgentsDetected();
         return;
@@ -159,7 +161,7 @@ export class ConfigureCommand {
     // 2) Build MCP server configuration
     const mcpConfig = await this.getMCPConfig();
     if (!mcpConfig) {
-      console.log('\n❌ Configuration aborted by user');
+      console.log('\n[CANCELLED] Configuration aborted by user');
       return;
     }
 
@@ -183,24 +185,25 @@ export class ConfigureCommand {
       command: this.options.command,
       args: this.options.args,
       cwd: this.options.cwd,
-      timeout: this.options.timeout,
+      ...(Number.isFinite(this.options.timeout) && this.options.timeout > 0 ? { timeout: this.options.timeout } : {}),
       configDir: this.options.configDir
     };
 
     // 4) Dry-run preview
     if (this.options.dryRun) {
       this.printDryRunPreview(detectedProviders.map(p => p.name), agentConfig);
+      logger.logStructured('info', { message: 'configure:dry-run', context: { providers: detectedProviders.map(p => p.name) } });
       return;
     }
 
     // 5) Preview redacted diff and confirmation (unless --yes)
     if (!this.options.yes) {
       if ((agentConfig.transport || 'http') === 'stdio') {
-        console.log('\nℹ️  STDIO selected: tool discovery/install and health checks will be handled in a later step (EPIC C).');
+        console.log('\n[INFO] STDIO selected: tool discovery/install and health checks will be handled in a later step.');
       }
       try {
         const { computeInstallPreview } = await import('../utils/preview.js');
-        console.log('\n🧪 Preview of changes (redacted):');
+        console.log('\n[INFO] Preview of changes (redacted):');
         for (const p of detectedProviders) {
           const preview = await computeInstallPreview(p, agentConfig);
           if (!preview) continue;
@@ -216,7 +219,7 @@ export class ConfigureCommand {
 
       const confirmed = await this.confirm(agentConfig, detectedProviders.map(p => p.name));
       if (!confirmed) {
-        console.log('\n❌ Configuration cancelled.');
+        console.log('\n[CANCELLED] Configuration cancelled.');
         return;
       }
     }

@@ -52,7 +52,6 @@ exports[`Protocol-aware rendering snapshots Cursor HTTP 1`] = `
       "headers": {
         "Authorization": "Bearer \${TOKEN}",
       },
-      "type": "http",
       "url": "https://mcp.notion.com/mcp",
     },
   },
@@ -131,6 +130,67 @@ exports[`Protocol-aware rendering snapshots Gemini STDIO 1`] = `
       },
       "timeout": 5000,
       "transport": "stdio",
+    },
+  },
+}
+`;
+
+exports[`Protocol-aware rendering snapshots Warp HTTP 1`] = `
+{
+  "mcpServers": {
+    "remote": {
+      "headers": {
+        "Authorization": "Bearer \${TOKEN}",
+      },
+      "serverUrl": "https://api.example.com/mcp",
+      "url": "https://api.example.com/mcp",
+    },
+  },
+}
+`;
+
+exports[`Protocol-aware rendering snapshots Warp STDIO 1`] = `
+{
+  "mcpServers": {
+    "local": {
+      "args": [
+        "-y",
+        "@mcp/local",
+      ],
+      "command": "npx",
+      "env": {
+        "FOO": "bar",
+      },
+    },
+  },
+}
+`;
+
+exports[`Protocol-aware rendering snapshots Windsurf HTTP 1`] = `
+{
+  "mcpServers": {
+    "remote": {
+      "headers": {
+        "Authorization": "Bearer \${TOKEN}",
+      },
+      "serverUrl": "https://api.example.com/mcp",
+    },
+  },
+}
+`;
+
+exports[`Protocol-aware rendering snapshots Windsurf STDIO 1`] = `
+{
+  "mcpServers": {
+    "local": {
+      "args": [
+        "-y",
+        "@mcp/local",
+      ],
+      "command": "npx",
+      "env": {
+        "FOO": "bar",
+      },
     },
   },
 }
