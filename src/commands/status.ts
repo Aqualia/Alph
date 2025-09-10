@@ -9,6 +9,7 @@ const TOML = require('@iarna/toml');
 import { FileOperations } from '../utils/fileOps';
 import type { GeminiConfig, CursorConfig, ClaudeConfig, GenericConfig } from '../types/config';
 import type { ProviderDetectionResult } from '../agents/provider';
+import { ui } from '../utils/ui';
 
 export interface StatusCommandOptions {
   format?: 'list' | 'json';
@@ -41,7 +42,7 @@ export async function executeStatusCommand(options: StatusCommandOptions = {}): 
   const providerStatuses: ProviderStatus[] = await buildProviderStatuses(filtered);
   const format = (options.format || 'list');
   if (format === 'json') {
-    console.log(JSON.stringify(providerStatuses, null, 2));
+    ui.info(JSON.stringify(providerStatuses, null, 2));
     return;
   }
   printList(providerStatuses, options);
@@ -176,11 +177,11 @@ function structuredCloneSafe<T>(v: T): T {
 
 
 function printList(statuses: ProviderStatus[], options: StatusCommandOptions): void {
-  console.log('\nAlph MCP Configuration Status');
-  console.log('----------------------------------------\n');
+  ui.info('\nAlph MCP Configuration Status');
+  ui.info('----------------------------------------\n');
 
   let detectedProviders = statuses.filter(s => s.detected);
-  let notDetectedProviders = statuses.filter(s => !s.detected);
+  const notDetectedProviders = statuses.filter(s => !s.detected);
 
   const hasServerProblem = (entry: RedactedServerEntry): boolean => {
     const c = entry.config as any;
@@ -203,17 +204,17 @@ function printList(statuses: ProviderStatus[], options: StatusCommandOptions): v
   }
 
   if (detectedProviders.length === 0 && notDetectedProviders.length === 0) {
-    console.log('No AI agents found.');
+    ui.info('No AI agents found.');
     return;
   }
 
   if (detectedProviders.length > 0) {
-    console.log('\x1b[1;32m✅ CONFIGURED AGENTS\x1b[0m');
+    ui.info('\x1b[1;32m✅ CONFIGURED AGENTS\x1b[0m');
     for (const s of detectedProviders) {
       const count = s.servers?.length ?? 0;
       const serverText = count === 1 ? '1 server' : `${count} servers`;
-      console.log(`\n\x1b[1m${s.name}\x1b[0m (${serverText})`);
-      console.log(`  Config file: ${s.configPath || 'N/A'}`);
+      ui.info(`\n\x1b[1m${s.name}\x1b[0m (${serverText})`);
+      ui.info(`  Config file: ${s.configPath || 'N/A'}`);
       if (count > 0) {
         for (const entry of s.servers!) {
           const c = entry.config as any;
@@ -227,24 +228,24 @@ function printList(statuses: ProviderStatus[], options: StatusCommandOptions): v
           const rawTransport = (explicit as string | undefined) || inferred;
           const endpoint = rawTransport === 'stdio' ? 'Local (STDIO)' : (c.httpUrl || c.url || 'N/A');
           const status = c.disabled === true ? 'disabled' : 'enabled';
-          console.log(`  • \x1b[1m${entry.id}\x1b[0m — Endpoint: ${endpoint}; Transport: ${rawTransport || 'N/A'}; Status: ${status}`);
+          ui.info(`  • \x1b[1m${entry.id}\x1b[0m — Endpoint: ${endpoint}; Transport: ${rawTransport || 'N/A'}; Status: ${status}`);
         }
       } else {
-        console.log('  • MCP Servers: None configured');
+        ui.info('  • MCP Servers: None configured');
       }
     }
   }
 
   if (notDetectedProviders.length > 0) {
-    if (detectedProviders.length > 0) console.log('');
-    console.log('\x1b[1;33m⚠️  UNAVAILABLE AGENTS\x1b[0m');
+    if (detectedProviders.length > 0) ui.info('');
+    ui.info('\x1b[1;33m⚠️  UNAVAILABLE AGENTS\x1b[0m');
     for (const s of notDetectedProviders) {
       const errorText = s.error ? ` (${s.error})` : '';
-      console.log(`\n\x1b[1m${s.name}\x1b[0m: Not detected${errorText}`);
+      ui.info(`\n\x1b[1m${s.name}\x1b[0m: Not detected${errorText}`);
     }
   }
 
-  console.log('\n');
+  ui.info('\n');
 }
 
 

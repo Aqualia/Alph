@@ -6,6 +6,7 @@
  */
 
 import { BackupInfo } from '../types/config';
+import { ui } from './ui';
 
 /**
  * Categories of errors that can occur during CLI operations.
@@ -321,36 +322,36 @@ export class ErrorHandler {
     error: Error,
     backupInfo?: BackupInfo
   ): Promise<void> {
-    console.error('Configuration Error:', error.message);
+    ui.error('Configuration Error: ' + error.message);
     
     if (error instanceof AlphError) {
-      console.error('Details:', error.userMessage);
+      ui.error('Details: ' + error.userMessage);
       
       if (error.suggestions.length > 0) {
-        console.error('Suggestions:');
+        ui.error('Suggestions:');
         error.suggestions.forEach((suggestion, index) => {
-          console.error(`  ${index + 1}. ${suggestion}`);
+          ui.error(`  ${index + 1}. ${suggestion}`);
         });
       }
       
       // Attempt backup restoration for high-severity errors
       if (error.severity === ErrorSeverity.HIGH && backupInfo) {
-        console.error(`\nAttempting to restore backup from ${backupInfo.backupPath}...`);
+        ui.error(`\nAttempting to restore backup from ${backupInfo.backupPath}...`);
         try {
           await this.restoreFromBackup(backupInfo);
-          console.error('Backup restored successfully.');
+          ui.error('Backup restored successfully.');
         } catch (restoreError) {
-          console.error('Failed to restore backup:', restoreError);
+          ui.error('Failed to restore backup: ' + (restoreError instanceof Error ? restoreError.message : String(restoreError)));
         }
       }
     }
     
     // Log detailed error information for debugging
     if (process.env['DEBUG']) {
-      console.error('Debug Information:');
-      console.error('Stack Trace:', error.stack);
+      ui.error('Debug Information:');
+      ui.error('Stack Trace: ' + (error.stack || ''));
       if (error instanceof AlphError) {
-        console.error('Context:', JSON.stringify(error.context, null, 2));
+        ui.error('Context: ' + JSON.stringify(error.context, null, 2));
       }
     }
   }
@@ -391,7 +392,7 @@ export class ErrorHandler {
   private static async restoreFromBackup(backupInfo: BackupInfo): Promise<void> {
     // This will be implemented when the backup utility is created
     // For now, just log the attempt
-    console.error(`Would restore ${backupInfo.originalPath} from ${backupInfo.backupPath}`);
+    ui.error(`Would restore ${backupInfo.originalPath} from ${backupInfo.backupPath}`);
   }
 
   /**

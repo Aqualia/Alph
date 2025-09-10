@@ -9,6 +9,7 @@ import { AgentConfig } from '../agents/provider';
 import { mapAliases, parseAgentNames, validateAgentNames } from '../utils/agents';
 import { existsSync, statSync } from 'fs';
 import { getInquirer } from '../utils/inquirer';
+import { ui } from '../utils/ui';
 
 /**
  * Options for the configure command
@@ -169,7 +170,7 @@ export class ConfigureCommand {
     
     // Only show detection message if not in interactive mode
     if (!this.options.interactive && !this.options.quiet) {
-      console.log('\n[INFO] Detecting available AI agents...');
+      ui.info('\n[INFO] Detecting available AI agents...');
     }
     
     const detectionResults = await defaultRegistry.detectAvailableAgents(providerFilter, this.options.configDir);
@@ -178,7 +179,7 @@ export class ConfigureCommand {
       // Fallback: if the user explicitly requested agents, proceed to configure them
       // even if no existing config files were detected. Providers will create files.
       if (valid.length > 0) {
-        console.log('\n[INFO] No existing configuration files detected; will create new ones for requested agents.');
+        ui.info('\n[INFO] No existing configuration files detected; will create new ones for requested agents.');
       } else {
         this.handleNoAgentsDetected();
         return;
@@ -188,7 +189,7 @@ export class ConfigureCommand {
     // 2) Build MCP server configuration
     const mcpConfig = await this.getMCPConfig();
     if (!mcpConfig) {
-      console.log('\n[CANCELLED] Configuration aborted by user');
+      ui.info('\n[CANCELLED] Configuration aborted by user');
       return;
     }
 
@@ -197,7 +198,7 @@ export class ConfigureCommand {
     let transport = this.options.transport;
     let endpoint = this.options.mcpServerEndpoint;
     let bearer = this.options.bearer;
-    let extraHeaders: Record<string, string> = {};
+    const extraHeaders: Record<string, string> = {};
     if (this.options.proxyRemoteUrl) {
       endpoint = this.options.proxyRemoteUrl;
       if (this.options.proxyTransport) transport = this.options.proxyTransport;
@@ -250,20 +251,20 @@ export class ConfigureCommand {
     // 5) Preview redacted diff and confirmation (unless --yes)
     if (!this.options.yes) {
       if ((agentConfig.transport || 'http') === 'stdio') {
-        console.log('\n[INFO] STDIO selected: tool discovery/install and health checks will be handled in a later step.');
+        ui.info('\n[INFO] STDIO selected: tool discovery/install and health checks will be handled in a later step.');
       }
       try {
         const { computeInstallPreview } = await import('../utils/preview.js');
-        console.log('\n[INFO] Preview of changes (redacted):');
+        ui.info('\n[INFO] Preview of changes (redacted):');
         for (const p of detectedProviders) {
           const effectiveConfig = await this.__mapConfigForPreview(p.name, agentConfig);
           const preview = await computeInstallPreview(p, effectiveConfig);
           if (!preview) continue;
-          console.log(`\n— ${p.name} (${preview.configPath})`);
-          console.log('Before (server snippet):');
-          console.log(preview.snippetBefore);
-          console.log('After (server snippet):');
-          console.log(preview.snippetAfter);
+          ui.info(`\n— ${p.name} (${preview.configPath})`);
+          ui.info('Before (server snippet):');
+          ui.info(preview.snippetBefore);
+          ui.info('After (server snippet):');
+          ui.info(preview.snippetAfter);
         }
       } catch {
         // non-fatal if preview fails
@@ -271,7 +272,7 @@ export class ConfigureCommand {
 
       const confirmed = await this.confirm(agentConfig, detectedProviders.map(p => p.name));
       if (!confirmed) {
-        console.log('\n[CANCELLED] Configuration cancelled.');
+        ui.info('\n[CANCELLED] Configuration cancelled.');
         return;
       }
     }
@@ -282,12 +283,16 @@ export class ConfigureCommand {
       try {
         const { telemetry } = await import('../utils/telemetry.js');
         telemetry.recordConfigure(detectionResults.length, 0, Date.now() - start);
-      } catch {}
+      } catch {
+        /* ignore telemetry errors */
+      }
     } catch (e) {
       try {
         const { telemetry } = await import('../utils/telemetry.js');
         telemetry.recordConfigure(0, 1, Date.now() - start);
-      } catch {}
+      } catch {
+        /* ignore telemetry errors */
+      }
       throw e;
     }
   }
@@ -336,13 +341,13 @@ export class ConfigureCommand {
    * Handles case when no agents are detected
    */
   private handleNoAgentsDetected(): void {
-    console.log('\n❌ No supported AI agents detected on this system.');
-    console.log('\nSupported agents and their default locations:');
-    console.log('  • Gemini CLI: ~/.gemini/settings.json');
-    console.log('  • Cursor: Platform-specific configuration');
-    console.log('  • Claude Code: Platform-specific configuration');
-    console.log('  • Codex CLI: ~/.codex/config.toml');
-    console.log('\nPlease install at least one supported AI agent and try again.');
+    ui.info('\n❌ No supported AI agents detected on this system.');
+    ui.info('\nSupported agents and their default locations:');
+    ui.info('  • Gemini CLI: ~/.gemini/settings.json');
+    ui.info('  • Cursor: Platform-specific configuration');
+    ui.info('  • Claude Code: Platform-specific configuration');
+    ui.info('  • Codex CLI: ~/.codex/config.toml');
+    ui.info('\nPlease install at least one supported AI agent and try again.');
   }
   
   /**
@@ -436,18 +441,12 @@ export class ConfigureCommand {
       }
       
       if (selectedProviders.length === 0) {
-        console.log(`\n⚠️  None of the requested agents (${requestedAgents.join(', ')}) were detected.`);
+        ui.info(`\n⚠️  None of the requested agents (${requestedAgents.join(', ')}) were detected.`);
         if (detectedProviders.length > 0) {
-          console.log('Detected agents:', detectedProviders.map(p => p.name).join(', '));
+          ui.info('Detected agents: ' + detectedProviders.map(p => p.name).join(', '));
         }
-        console.log('Proceeding to create new configuration files for requested agents.');
+        ui.info('Proceeding to create new configuration files for requested agents.');
       }
-    }
-    
-    // Only show detailed configuration info if not in interactive mode
-    if (!this.options.interactive) {
-      console.log(`\n🔧 Configuring ${selectedProviders.length} selected agent(s)...`);
-      selectedProviders.forEach(p => console.log(`  • ${p.name}`));
     }
     
     const configResults = await defaultRegistry.configureAllDetectedAgents(
@@ -462,37 +461,37 @@ export class ConfigureCommand {
     
     if (configSummary.successful > 0) {
       if (!this.options.interactive) {
-        console.log(`\n✅ Successfully configured ${configSummary.successful} agent(s):`);
+        ui.info(`\n✅ Successfully configured ${configSummary.successful} agent(s):`);
         for (const result of configResults.filter(r => r.success)) {
-          console.log(`  • ${result.provider.name}`);
+          ui.info(`  • ${result.provider.name}`);
           // Try to get the configuration file path from the provider
           try {
             const configPath = await result.provider.detect(agentConfig.configDir);
             if (configPath) {
-              console.log(`    └─ Config file: ${configPath}`);
+              ui.info(`    └─ Config file: ${configPath}`);
             }
           } catch (e) {
             // Ignore errors in getting config path for display purposes
           }
           if (result.backupPath) {
-            console.log(`    └─ Backup created: ${result.backupPath}`);
+            ui.info(`    └─ Backup created: ${result.backupPath}`);
           }
         }
       } else {
         // In interactive mode, show a simpler success message
-        console.log(`\n✅ Successfully configured ${configSummary.successful} agent(s)`);
+        ui.info(`\n✅ Successfully configured ${configSummary.successful} agent(s)`);
       }
     }
     
     if (configSummary.failed > 0) {
       if (!this.options.interactive) {
-        console.log(`\n❌ Failed to configure ${configSummary.failed} agent(s):`);
+        ui.info(`\n❌ Failed to configure ${configSummary.failed} agent(s):`);
         for (const failed of configResults.filter(r => !r.success)) {
-          console.log(`  • ${failed.provider.name}: ${failed.error || 'Unknown error'}`);
+          ui.info(`  • ${failed.provider.name}: ${failed.error || 'Unknown error'}`);
         }
       } else {
         // In interactive mode, show a simpler failure message
-        console.log(`\n❌ Failed to configure ${configSummary.failed} agent(s)`);
+        ui.info(`\n❌ Failed to configure ${configSummary.failed} agent(s)`);
       }
 
       // Propagate error so callers/tests can handle as a rejected promise
@@ -501,20 +500,20 @@ export class ConfigureCommand {
     }
     
     if (!this.options.interactive) {
-      console.log('\n✨ Configuration complete!');
+      ui.info('\n✨ Configuration complete!');
       
       // Show summary of all configured agents
       if (configSummary.successful > 0) {
-        console.log('\n📋 Configuration Summary:');
-        console.log('='.repeat(40));
-        console.log('The following agents have been configured with your MCP server:');
+        ui.info('\n📋 Configuration Summary:');
+        ui.info('='.repeat(40));
+        ui.info('The following agents have been configured with your MCP server:');
         for (const result of configResults.filter(r => r.success)) {
-          console.log(`  • ${result.provider.name}`);
+          ui.info(`  • ${result.provider.name}`);
           // Try to get the configuration file path from the provider
           try {
             const configPath = await result.provider.detect(agentConfig.configDir);
             if (configPath) {
-              console.log(`    └─ Configuration file: ${configPath}`);
+              ui.info(`    └─ Configuration file: ${configPath}`);
             }
           } catch (e) {
             // Ignore errors in getting config path for display purposes
@@ -523,17 +522,17 @@ export class ConfigureCommand {
         
         // Show backup summary
         if (configSummary.backupPaths.length > 0) {
-          console.log('\n💾 Backup Summary:');
-          console.log('='.repeat(40));
-          console.log('The following backup files were created:');
+          ui.info('\n💾 Backup Summary:');
+          ui.info('='.repeat(40));
+          ui.info('The following backup files were created:');
           for (const backup of configSummary.backupPaths) {
-            console.log(`  • ${backup.provider}: ${backup.backupPath}`);
+            ui.info(`  • ${backup.provider}: ${backup.backupPath}`);
           }
         }
       }
     } else {
       // In interactive mode, show a simpler completion message
-      console.log('\n✨ Configuration complete!');
+      ui.info('\n✨ Configuration complete!');
     }
   }
 
@@ -544,33 +543,33 @@ export class ConfigureCommand {
   }
 
   private printDryRunPreview(providers: string[], agentConfig: AgentConfig): void {
-    console.log('\n🔎 Dry-run: planned configuration');
-    console.log('='.repeat(40));
-    console.log('Agents to configure:');
-    providers.forEach(p => console.log(`  • ${p}`));
-    console.log('\nMCP server:');
+    ui.info('\n🔎 Dry-run: planned configuration');
+    ui.info('='.repeat(40));
+    ui.info('Agents to configure:');
+    providers.forEach(p => ui.info(`  • ${p}`));
+    ui.info('\nMCP server:');
     const endpointDisplay = (agentConfig.transport === 'stdio') ? 'Local (STDIO)' : (agentConfig.mcpServerUrl || '');
-    console.log(`  Endpoint: ${endpointDisplay}`);
-    console.log(`  • ID: ${agentConfig.mcpServerId}`);
-    console.log(`  • Transport: ${agentConfig.transport}`);
+    ui.info(`  Endpoint: ${endpointDisplay}`);
+    ui.info(`  • ID: ${agentConfig.mcpServerId}`);
+    ui.info(`  • Transport: ${agentConfig.transport}`);
     if (agentConfig.mcpAccessKey) {
-      console.log(`  • Access Key: ${this.redact(agentConfig.mcpAccessKey)} (redacted)`);
+      ui.info(`  • Access Key: ${this.redact(agentConfig.mcpAccessKey)} (redacted)`);
     }
-    console.log('\nNote: this is a preview only. No files were modified.');
+    ui.info('\nNote: this is a preview only. No files were modified.');
   }
 
   private async confirm(agentConfig: AgentConfig, providers: string[]): Promise<boolean> {
-    console.log('\n🔍 Configuration Summary');
-    console.log('='.repeat(40));
-    console.log('The following agents will be configured:');
-    providers.forEach(p => console.log(`  • ${p}`));
-    console.log('\nMCP Server Configuration:');
+    ui.info('\n🔍 Configuration Summary');
+    ui.info('='.repeat(40));
+    ui.info('The following agents will be configured:');
+    providers.forEach(p => ui.info(`  • ${p}`));
+    ui.info('\nMCP Server Configuration:');
     const endpointDisplay2 = (agentConfig.transport === 'stdio') ? 'Local (STDIO)' : (agentConfig.mcpServerUrl || '');
-    console.log(`  Endpoint: ${endpointDisplay2}`);
-    console.log(`  • ID: ${agentConfig.mcpServerId}`);
-    console.log(`  • Transport: ${agentConfig.transport}`);
+    ui.info(`  Endpoint: ${endpointDisplay2}`);
+    ui.info(`  • ID: ${agentConfig.mcpServerId}`);
+    ui.info(`  • Transport: ${agentConfig.transport}`);
     if (agentConfig.mcpAccessKey) {
-      console.log(`  • Access Key: ${this.redact(agentConfig.mcpAccessKey)} (redacted)`);
+      ui.info(`  • Access Key: ${this.redact(agentConfig.mcpAccessKey)} (redacted)`);
     }
     const inquirer = await getInquirer();
     const { confirmed } = await inquirer.prompt([
@@ -635,7 +634,7 @@ export async function executeConfigureCommand(options: ConfigureCommandOptions =
     const command = new ConfigureCommand(options);
     await command.execute();
   } catch (error) {
-    console.error('\n❌ Error:', error instanceof Error ? error.message : 'Unknown error');
+    ui.error('\n❌ Error: ' + (error instanceof Error ? error.message : 'Unknown error'));
     // Re-throw so integration tests can assert on the failure instead of process exiting
     throw (error instanceof Error ? error : new Error(String(error)));
   }

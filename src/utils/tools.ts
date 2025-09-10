@@ -1,4 +1,5 @@
 import { spawnSync, execSync } from 'child_process';
+import { ui } from './ui';
 import { ToolEntry, ToolsCatalog, defaultToolsCatalogLoader } from '../catalog/toolsLoader';
 
 export type InstallManager = 'npm' | 'brew' | 'pipx' | 'cargo' | 'auto';
@@ -88,7 +89,7 @@ export async function installTool(tool: ToolEntry, preferred?: InstallManager): 
   }
   if (!chosen) throw new Error('No installer defined for this platform');
 
-  console.log(`\n📦 Installing ${tool.id} using: ${chosen.command}`);
+  ui.info(`\n📦 Installing ${tool.id} using: ${chosen.command}`);
   execSync(chosen.command, { stdio: 'inherit', env: process.env });
 }
 

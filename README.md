@@ -47,6 +47,14 @@ See detailed guides in [docs/agents](./docs/agents/README.md).
 npm install -g @aqualia/alph-cli
 ```
 
+### Try in 30 seconds
+
+```bash
+npx @aqualia/alph-cli@latest
+```
+
+Or install globally and run `alph`.
+
 ### Requirements
 
 - Node.js 18.0.0 or higher
@@ -67,21 +75,21 @@ alph setup
 ### Setup (non-interactive)
 
 ```bash
-# Configure detected agents with an Async.link MCP endpoint (with bearer token)
+# Configure detected agents with a remote MCP endpoint (with bearer token)
 alph setup \
-  --mcp-server-endpoint https://askhuman.net/mcp/<server-id> \
-  --bearer your-access-token
+  --mcp-server-endpoint https://mcp.example.com/server-id \
+  --bearer ${YOUR_TOKEN}
 
 # Filter to specific agents
 alph setup \
-  --mcp-server-endpoint https://askhuman.net/mcp/<server-id> \
+  --mcp-server-endpoint https://mcp.example.com/server-id \
   --agents gemini,cursor \
 
 
 # Dry-run preview (no file changes)
 alph setup \
-  --mcp-server-endpoint https://askhuman.net/mcp/<server-id> \
-  --bearer your-access-token \
+  --mcp-server-endpoint https://mcp.example.com/server-id \
+  --bearer ${YOUR_TOKEN} \
   --agents gemini,cursor \
   --dry-run
 ```
@@ -107,6 +115,23 @@ ALPH_ATOMIC_MODE=copy alph setup --mcp-server-endpoint https://... --agents gemi
 # Show detected agents and configured MCP servers
 alph status
 ```
+
+### Compatibility Matrix
+
+The following agents are supported across operating systems and transport types:
+
+| Agent        | macOS | Linux | Windows | HTTP | SSE | STDIO |
+|--------------|:-----:|:-----:|:-------:|:----:|:---:|:-----:|
+| Gemini CLI   |  ✅   |  ✅   |   ✅    |  ✅  | ✅  |  ✅   |
+| Cursor       |  ✅   |  ✅   |   ✅    |  ✅  | ✅  |  ✅   |
+| Claude Code  |  ✅   |  ✅   |   ✅    |  ✅  | ✅  |  ✅   |
+| Windsurf     |  ✅   |  ✅   |   ✅    |  ✅  | ✅  |  ✅   |
+| Warp         |  ✅   |  ✅   |   ✅    |  ✅  | ✅  |  ✅   |
+| Codex CLI    |  ✅   |  ✅   |   ✅    |  ✅  | ✅  |  ✅   |
+
+Notes:
+- STDIO tools may require a one-time local install. Alph can handle detection and optional installation.
+- Some IDEs manage MCP configuration at project scope; see agent-specific guides in `docs/agents/`.
 
 ### Command reference
 
@@ -143,15 +168,7 @@ alph remove [options]
 
 ### Protocol rendering examples
 
-Cursor (project scope file)
-- STDIO: `{ "mcpServers": { "github": { "command": "npx", "args": ["-y","@modelcontextprotocol/github-mcp"], "env": { "GITHUB_TOKEN": "${GITHUB_TOKEN}" } } } }`
-- SSE: `{ "mcpServers": { "linear": { "type": "sse", "url": "https://mcp.linear.app/sse", "headers": { "Authorization": "Bearer ${LINEAR_TOKEN}" } } } }`
-- HTTP: `{ "mcpServers": { "notion": { "type": "http", "url": "https://mcp.notion.com/mcp", "headers": { "Authorization": "Bearer ${NOTION_TOKEN}" } } } }`
-
-Gemini (settings.json)
-- STDIO: `{ "mcpServers": { "github": { "transport": "stdio", "command": "github-mcp", "args": [], "env": {"GITHUB_TOKEN":"${GITHUB_TOKEN}"} } } }`
-- SSE: `{ "mcpServers": { "linear": { "transport": "sse", "url": "https://mcp.linear.app/sse", "headers": { "Authorization": "Bearer ${LINEAR_TOKEN}" } } } }`
-- HTTP: `{ "mcpServers": { "notion": { "httpUrl": "https://mcp.notion.com/mcp", "headers": { "Authorization": "Bearer ${NOTION_TOKEN}" } } } }`
+Moved to `docs/agents/protocol-examples.md` for clarity and maintainability.
 
 ## Why Alph?
 1. **Security**: Local-first design — no network requests and sensitive values are redacted in output.

@@ -7,6 +7,7 @@ import { BackupManager } from '../utils/backup';
 import { SafeEditManager } from '../utils/safeEdit';
 import { AgentDetector } from './detector';
 import { resolveConfigPath } from '../catalog/adapter';
+import { ui } from '../utils/ui';
 
 /**
  * Gemini CLI provider for configuring Google's Gemini CLI tool
@@ -458,8 +459,7 @@ export class GeminiProvider implements AgentProvider {
       const log = (reason: string, extra?: unknown) => {
         if (DBG) {
           try {
-            // eslint-disable-next-line no-console
-            console.error(`[Gemini.validate] ${reason}` + (extra !== undefined ? ` :: ${JSON.stringify(extra)}` : ''));
+            ui.debug(`[Gemini.validate] ${reason}` + (extra !== undefined ? ` :: ${JSON.stringify(extra)}` : ''));
           } catch {
             // noop
           }
@@ -593,8 +593,7 @@ export class GeminiProvider implements AgentProvider {
     } catch (error) {
       const DBG = process?.env?.['ALPH_DEBUG_GEMINI'] === '1';
       if (DBG) {
-        // eslint-disable-next-line no-console
-        console.error('[Gemini.validate] exception during validation', error);
+        ui.debug('[Gemini.validate] exception during validation ' + (error instanceof Error ? error.message : String(error)));
       }
       return false;
     }

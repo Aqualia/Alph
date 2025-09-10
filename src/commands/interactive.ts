@@ -7,6 +7,7 @@ import { MCPServerConfig } from '../types/config';
 import { mapAliases, parseAgentNames, validateAgentNames } from '../utils/agents';
 import { existsSync, statSync } from 'fs';
 import { getInquirer } from '../utils/inquirer';
+import { ui } from '../utils/ui';
 
 /**
  * Interactive CLI interface for Alph configuration
@@ -29,7 +30,7 @@ export class InteractiveConfigurator {
    */
   public async start(): Promise<void> {
     await this.showWelcomeMessage();
-    console.log('🧭 Step 1 of 3: Select agents');
+    ui.info('🧭 Step 1 of 3: Select agents');
     
     // 1. Detect available agents
     const detectedAgents = await this.detectAgents();
@@ -49,29 +50,29 @@ export class InteractiveConfigurator {
         // If prefill resulted in empty set, fall back to prompting
         selectedAgents = await this.selectAgents(detectedAgents);
       } else {
-        console.log('\nUsing pre-selected agents:');
-        selectedAgents.forEach(a => console.log(`  - ${a}`));
+        ui.info('\nUsing pre-selected agents:');
+        selectedAgents.forEach(a => ui.info(`  - ${a}`));
       }
     } else {
       selectedAgents = await this.selectAgents(detectedAgents);
     }
     if (selectedAgents.length === 0) {
-      console.log('\nNo agents selected. Exiting.');
+      ui.info('\nNo agents selected. Exiting.');
       return;
     }
     
     // 3. Get MCP server configuration (supports pre-filled endpoint & access key)
-    console.log('\n🧰 Step 2 of 3: Configure server');
+    ui.info('\n🧰 Step 2 of 3: Configure server');
     const mcpConfig = await this.getMCPConfig(selectedAgents);
     if (!mcpConfig) {
-      console.log('\nConfiguration aborted.');
+      ui.info('\nConfiguration aborted.');
       return;
     }
 
     // 3.5. Ask about config directory preference
     const configDirChoice = await this.getConfigDirectoryChoice();
     if (configDirChoice.cancelled) {
-      console.log('\nConfiguration cancelled.');
+      ui.info('\nConfiguration cancelled.');
       return;
     }
     
@@ -79,17 +80,17 @@ export class InteractiveConfigurator {
     const backupPref = await this.getBackupPreference();
 
     // 4. Confirm configuration
-    console.log('\n📝 Step 3 of 3: Review & apply');
+    ui.info('\n📝 Step 3 of 3: Review & apply');
     const confirmed = await this.confirmConfiguration(selectedAgents, mcpConfig, backupPref);
     if (!confirmed) {
-      console.log('\nConfiguration cancelled.');
+      ui.info('\nConfiguration cancelled.');
       return;
     }
     
     // Optional pre-warm for Supergateway to reduce first-run latency (Windows/Linux/macOS)
     try {
       if (selectedAgents.includes('Codex CLI') && mcpConfig.transport !== 'stdio') {
-        console.log('\n[INFO] Pre-warming local proxy (supergateway) ...');
+        ui.info('\n[INFO] Pre-warming local proxy (supergateway) ...');
         const { execSync } = await import('child_process');
         execSync('npx -y supergateway --help', { stdio: 'ignore' });
       }
@@ -107,17 +108,17 @@ export class InteractiveConfigurator {
   private async showWelcomeMessage(): Promise<void> {
     const { showMainBanner } = await import('../utils/banner.js');
     await showMainBanner();
-    console.log('Welcome to the Alph Configuration Wizard');
-    console.log('-'.repeat(42));
-    console.log('Configure your AI agents to work with MCP servers');
-    console.log();
+    ui.info('Welcome to the Alph Configuration Wizard');
+    ui.info('-'.repeat(42));
+    ui.info('Configure your AI agents to work with MCP servers');
+    ui.info('');
   }
   
   /**
    * Detects available agents on the system
    */
   private async detectAgents(): Promise<string[]> {
-    console.log('Detecting available AI agents...');
+    ui.info('Detecting available AI agents...');
     
     const detectionResults = await defaultRegistry.detectAvailableAgents();
     const detectionSummary = defaultRegistry.summarizeDetectionResults(detectionResults);
@@ -126,17 +127,17 @@ export class InteractiveConfigurator {
       return [];
     }
     
-    console.log(`\nFound ${detectionSummary.detected} AI agent(s):`);
+    ui.info(`\nFound ${detectionSummary.detected} AI agent(s):`);
     detectionSummary.detectedProviders.forEach(provider => {
-      console.log(`  - ${provider}`);
+      ui.info(`  - ${provider}`);
     });
     
     // Only show failed detections if there are any, but don't include them in the return
     if (detectionSummary.failed > 0) {
-      console.log(`\n${detectionSummary.failed} agent(s) could not be detected:`);
+      ui.warn(`\n${detectionSummary.failed} agent(s) could not be detected:`);
       const failedDetections = defaultRegistry.getFailedDetections(detectionResults);
       failedDetections.forEach(failed => {
-        console.log(`  - ${failed.provider.name}: ${failed.error || 'Detection failed'}`);
+        ui.warn(`  - ${failed.provider.name}: ${failed.error || 'Detection failed'}`);
       });
     }
 
@@ -147,13 +148,13 @@ export class InteractiveConfigurator {
    * Shows a helpful message when no agents are detected
    */
   private showNoAgentsDetected(): void {
-    console.log('\n? No supported AI agents detected on this system.');
-    console.log('\nSupported agents and their default locations:');
-    console.log('  \u0007 Gemini CLI: ~/.gemini/settings.json');
-    console.log('  \u0007 Cursor: Platform-specific configuration');
-    console.log('  \u0007 Claude Code: Platform-specific configuration');
-    console.log('  \u0007 Codex CLI: ~/.codex/config.toml');
-    console.log('\nPlease install at least one supported AI agent and try again.');
+    ui.info('\n? No supported AI agents detected on this system.');
+    ui.info('\nSupported agents and their default locations:');
+    ui.info('  \u0007 Gemini CLI: ~/.gemini/settings.json');
+    ui.info('  \u0007 Cursor: Platform-specific configuration');
+    ui.info('  \u0007 Claude Code: Platform-specific configuration');
+    ui.info('  \u0007 Codex CLI: ~/.codex/config.toml');
+    ui.info('\nPlease install at least one supported AI agent and try again.');
   }
   
   /**
@@ -378,7 +379,7 @@ export class InteractiveConfigurator {
         const isPnpmDLX = (cmdLower === 'pnpm' || cmdLower.endsWith('pnpm.cmd')) && argsLower[0] === 'dlx';
         if (isNPX || isYarnDLX || isPnpmDLX) {
           const warmArgs = [...(invoke.args || []), '--help'];
-          console.log('\nPreparing the tool for first use. This first run can take a minute.');
+          ui.info('\nPreparing the tool for first use. This first run can take a minute.');
           execSync([invoke.command, ...warmArgs].join(' '), { stdio: 'ignore' });
         }
       } catch {
@@ -541,28 +542,28 @@ export class InteractiveConfigurator {
     mcpConfig: MCPServerConfig,
     backup: boolean
   ): Promise<boolean> {
-    console.log('\nConfiguration Summary');
-    console.log('='.repeat(50));
-    console.log('Review your settings before applying changes:');
+    ui.info('\nConfiguration Summary');
+    ui.info('='.repeat(50));
+    ui.info('Review your settings before applying changes:');
     
-    console.log('\nSelected AI Agents:');
-    agents.forEach(agent => console.log(`  - ${agent}`));
+    ui.info('\nSelected AI Agents:');
+    agents.forEach(agent => ui.info(`  - ${agent}`));
     
-    console.log('\nMCP Server Configuration:');
-    console.log(`  - Name: ${mcpConfig.name}`);
+    ui.info('\nMCP Server Configuration:');
+    ui.info(`  - Name: ${mcpConfig.name}`);
     const endpointDisplay = mcpConfig.transport === 'stdio' ? 'Local (STDIO)' : (mcpConfig.httpUrl || '');
-    console.log(`  - Endpoint: ${endpointDisplay}`);
-    console.log(`  - Transport: ${mcpConfig.transport}`);
+    ui.info(`  - Endpoint: ${endpointDisplay}`);
+    ui.info(`  - Transport: ${mcpConfig.transport}`);
     if (this.options.bearer) {
       const token = this.options.bearer;
       const last4 = token.slice(-4);
-      console.log(`  - Authentication Token: ****${last4} (redacted)`);
+      ui.info(`  - Authentication Token: ****${last4} (redacted)`);
     }
     
     // Configuration details
-    console.log('\nConfiguration Details:');
-    console.log('  - Changes are atomic with automatic rollback support');
-    console.log(`  - Backups: ${backup ? 'Enabled' : 'Disabled'}`);
+    ui.info('\nConfiguration Details:');
+    ui.info('  - Changes are atomic with automatic rollback support');
+    ui.info(`  - Backups: ${backup ? 'Enabled' : 'Disabled'}`);
     
     const inquirer = await getInquirer();
     const { confirmed } = await inquirer.prompt({
@@ -630,7 +631,7 @@ options: ConfigureCommandOptions = {}
 ): Promise<void> {
   // Set up graceful exit handling
   const handleExit = () => {
-    console.log('\n\nSetup cancelled. Goodbye!');
+    ui.info('\n\nSetup cancelled. Goodbye!');
     process.exit(0);
   };
 
@@ -648,12 +649,12 @@ options: ConfigureCommandOptions = {}
       error.message.includes('canceled') ||
       error.message.includes('cancelled')
     )) {
-      console.log('\n\nSetup cancelled. Goodbye!');
+      ui.info('\n\nSetup cancelled. Goodbye!');
       process.exit(0);
     }
 
-    console.error('\nError during interactive configuration:');
-    console.error(error instanceof Error ? error.message : 'Unknown error');
+    ui.error('\nError during interactive configuration:');
+    ui.error(error instanceof Error ? error.message : 'Unknown error');
 
     // Re-throw so integration tests and callers can handle failures
     throw (error instanceof Error ? error : new Error(String(error)));

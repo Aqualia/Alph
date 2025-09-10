@@ -14,6 +14,7 @@ import { ClaudeProvider } from './claude';
 import { WindsurfProvider } from './windsurf';
 import { WarpProvider } from './warp';
 import { CodexProvider } from './codex';
+import { ui } from '../utils/ui';
 
 /**
  * Configuration options for the agent registry
@@ -548,7 +549,7 @@ export class AgentRegistry {
         }
       } catch (rollbackError) {
         // Log rollback errors but don't throw - we want to attempt all rollbacks
-        console.error(`Failed to rollback ${result.provider.name}: ${rollbackError}`);
+        ui.error(`Failed to rollback ${result.provider.name}: ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`);
       }
     });
 
@@ -876,9 +877,9 @@ export class AgentRegistry {
           await result.provider.rollback();
         }
       } catch (rollbackError) {
-        // Log rollback errors but don't throw - we want to attempt all rollbacks
-        console.error(`Failed to rollback ${result.provider.name}: ${rollbackError}`);
-      }
+    // Log rollback errors but don't throw - we want to attempt all rollbacks
+    ui.error(`Failed to rollback ${result.provider.name}: ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`);
+  }
     });
 
     await Promise.all(rollbackPromises);

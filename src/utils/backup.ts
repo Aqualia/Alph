@@ -1,6 +1,7 @@
 import { promises as fs } from 'fs';
 import { resolve, dirname, basename, extname, join } from 'path';
 import { FileOperations } from './fileOps';
+import { ui } from './ui';
 
 /**
  * Information about a backup file
@@ -166,7 +167,7 @@ export class BackupManager {
             cleanedCount++;
           } catch (error) {
             // Log but don't fail on cleanup errors
-            console.warn(`Failed to cleanup backup ${backup.path}: ${error}`);
+            ui.warn(`Failed to cleanup backup ${backup.path}: ${error instanceof Error ? error.message : String(error)}`);
           }
         }
       }

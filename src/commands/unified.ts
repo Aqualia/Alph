@@ -46,7 +46,16 @@ export class UnifiedCommand {
     this.program
       .name('alph')
       .description('')
-      .version(packageJson.version, '-v, --version', 'Show version');
+      .version(packageJson.version, '-v, --version', 'Show version')
+      .option('--verbose', 'Enable verbose logging', false)
+      .hook('preAction', (thisCommand) => {
+        // Commander v11: prefer optsWithGlobals when available
+        const anyCmd: any = thisCommand as any;
+        const opts = typeof anyCmd.optsWithGlobals === 'function' ? anyCmd.optsWithGlobals() : thisCommand.opts();
+        if (opts && opts.verbose) {
+          process.env['ALPH_VERBOSE'] = '1';
+        }
+      });
 
     // Removed global interactive flag (-i). Use 'setup' command for interactive flow.
 

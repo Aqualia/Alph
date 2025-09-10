@@ -1,5 +1,6 @@
 import { spawn } from 'child_process';
 import { buildSupergatewayArgs, redactForLogs, ProxyHeader } from '../utils/proxy';
+import { ui } from '../utils/ui';
 
 export interface ProxyRunOptions {
   remoteUrl: string;
@@ -52,7 +53,7 @@ export async function proxyRun(opts: ProxyRunOptions): Promise<number> {
     : ['-y', `supergateway@${pinned}`, ...argv];
 
   const redacted = redactForLogs([command, ...args]).join(' ');
-  console.log(`[alph] launching proxy (pin ${pinned}): ${redacted}`);
+  ui.info(`[alph] launching proxy (pin ${pinned}): ${redacted}`);
 
   return new Promise<number>((resolve) => {
     const child = spawn(command, args, { stdio: 'inherit' });
@@ -72,7 +73,7 @@ export async function proxyHealth(opts: ProxyHealthOptions): Promise<number> {
   });
   const pinned = getPinnedVersion(opts.proxyVersion);
   const preview = redactForLogs(['npx', '-y', `supergateway@${pinned}`, ...argv]).join(' ');
-  console.log(`[alph] health probe: ${preview}`);
+  ui.info(`[alph] health probe: ${preview}`);
 
   try {
     const controller = new AbortController();
@@ -86,7 +87,7 @@ export async function proxyHealth(opts: ProxyHealthOptions): Promise<number> {
       const resp = await fetch(url, { method: 'GET', headers: hdrs, signal: controller.signal as any });
       clearTimeout(t);
       if (resp.ok) return 0;
-      console.error(`[alph] health: HTTP status ${resp.status}`);
+      ui.error(`[alph] health: HTTP status ${resp.status}`);
       return 2;
     } else {
       hdrs['Accept'] = 'text/event-stream';
@@ -94,14 +95,14 @@ export async function proxyHealth(opts: ProxyHealthOptions): Promise<number> {
       const ct = resp.headers.get('content-type') || '';
       clearTimeout(t);
       if (!resp.ok || !ct.toLowerCase().includes('text/event-stream')) {
-        console.error(`[alph] health: SSE handshake failed (status ${resp.status}, content-type ${ct})`);
+        ui.error(`[alph] health: SSE handshake failed (status ${resp.status}, content-type ${ct})`);
         return 3;
       }
       // Consider headers sufficient for health
       return 0;
     }
   } catch (e) {
-    console.error(`[alph] health error: ${e instanceof Error ? e.message : String(e)}`);
+    ui.error(`[alph] health error: ${e instanceof Error ? e.message : String(e)}`);
     return 1;
   }
 }

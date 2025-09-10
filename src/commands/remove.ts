@@ -9,6 +9,7 @@ import { RemovalConfig, ProviderRemovalResult, type AgentProvider } from '../age
 import { defaultRegistry } from '../agents/registry';
 import { mapAliases, parseAgentNames, validateAgentNames } from '../utils/agents';
 import { getInquirer } from '../utils/inquirer';
+import { ui } from '../utils/ui';
 
 /**
  * Options for the remove command
@@ -92,7 +93,7 @@ export class RemoveCommand {
       const inquirer = await getInquirer();
 
       // Detect available agents
-      console.log('\n🔍 Detecting available AI agents...');
+      ui.info('\n🔍 Detecting available AI agents...');
       const detectionResults = await defaultRegistry.detectAvailableAgents(undefined, this.options.configDir);
       const detectedProviders = defaultRegistry.getDetectedProviders(detectionResults);
       if (detectedProviders.length === 0) {
@@ -115,7 +116,7 @@ export class RemoveCommand {
 
       const allServerIds = Array.from(serverIdSet.values());
       if (allServerIds.length === 0) {
-        console.log('\n❌ No MCP servers found in detected agents.');
+        ui.info('\n❌ No MCP servers found in detected agents.');
         return;
       }
 
@@ -139,7 +140,7 @@ export class RemoveCommand {
         .map(([name]) => name);
 
       if (providersWithServer.length === 0) {
-        console.log(`\n❌ MCP server '${chosenServerName}' not found in any detected agent.`);
+        ui.info(`\n❌ MCP server '${chosenServerName}' not found in any detected agent.`);
         return;
       }
 
@@ -155,7 +156,7 @@ export class RemoveCommand {
       ]);
 
       if (!Array.isArray(selectedProviders) || selectedProviders.length === 0) {
-        console.log('\n❌ No agents selected. Exiting.');
+        ui.info('\n❌ No agents selected. Exiting.');
         return;
       }
 
@@ -191,7 +192,7 @@ export class RemoveCommand {
     }
     const providerFilter = valid.length > 0 ? valid : undefined;
     
-    console.log('\n🔍 Detecting available AI agents...');
+    ui.info('\n🔍 Detecting available AI agents...');
     const detectionResults = await defaultRegistry.detectAvailableAgents(providerFilter, this.options.configDir);
     const detectedProviders = defaultRegistry.getDetectedProviders(detectionResults);
     
@@ -203,7 +204,7 @@ export class RemoveCommand {
     // 3) Check if the server exists in any detected provider
     const serversFound = await this.findMCPServerInProviders(detectedProviders, this.options.serverName);
     if (serversFound.length === 0) {
-      console.log(`\n❌ MCP server '${this.options.serverName}' not found in any detected agent.`);
+      ui.info(`\n❌ MCP server '${this.options.serverName}' not found in any detected agent.`);
       return;
     }
 
@@ -224,15 +225,15 @@ export class RemoveCommand {
     if (!this.options.yes) {
       try {
         const { computeRemovalPreview } = await import('../utils/preview.js');
-        console.log('\n🧪 Preview of changes (redacted):');
+        ui.info('\n🧪 Preview of changes (redacted):');
         for (const entry of serversFound) {
           const preview = await computeRemovalPreview(entry.provider, removalConfig);
           if (!preview) continue;
-          console.log(`\n— ${entry.provider.name} (${preview.configPath})`);
-          console.log('Before (server snippet):');
-          console.log(preview.snippetBefore);
-          console.log('After (server snippet):');
-          console.log(preview.snippetAfter);
+          ui.info(`\n— ${entry.provider.name} (${preview.configPath})`);
+          ui.info('Before (server snippet):');
+          ui.info(preview.snippetBefore);
+          ui.info('After (server snippet):');
+          ui.info(preview.snippetAfter);
         }
       } catch {
         // preview failures are non-fatal
@@ -240,7 +241,7 @@ export class RemoveCommand {
 
       const confirmed = await this.confirm(serversFound, removalConfig);
       if (!confirmed) {
-        console.log('\n❌ Removal cancelled.');
+        ui.info('\n❌ Removal cancelled.');
         return;
       }
     }
@@ -284,7 +285,7 @@ export class RemoveCommand {
         }
       } catch (error) {
         // Ignore errors when checking individual providers
-        console.warn(`⚠️  Warning: Could not check ${provider.name} for server '${serverName}': ${error}`);
+        ui.warn(`⚠️  Warning: Could not check ${provider.name} for server '${serverName}': ${error}`);
       }
     }
     
@@ -295,37 +296,37 @@ export class RemoveCommand {
    * Prints dry-run preview of the removal operation
    */
   private printDryRunPreview(providersWithServer: Array<{provider: AgentProvider; serverId: string}>, removalConfig: RemovalConfig): void {
-    console.log('\n🔎 Dry-run: planned removal operation');
-    console.log('='.repeat(40));
-    console.log('MCP server to remove:');
-    console.log(`  • Server ID: ${removalConfig.mcpServerId}`);
-    console.log('\nAgents that will be affected:');
-    providersWithServer.forEach(({provider}) => console.log(`  • ${provider.name}`));
-    console.log('\nBackup behavior:');
-    console.log(`  • Backups ${this.options.backup ? 'will' : 'will not'} be created before removal`);
-    console.log('\nNote: this is a preview only. No files will be modified.');
+    ui.info('\n🔎 Dry-run: planned removal operation');
+    ui.info('='.repeat(40));
+    ui.info('MCP server to remove:');
+    ui.info(`  • Server ID: ${removalConfig.mcpServerId}`);
+    ui.info('\nAgents that will be affected:');
+    providersWithServer.forEach(({provider}) => ui.info(`  • ${provider.name}`));
+    ui.info('\nBackup behavior:');
+    ui.info(`  • Backups ${this.options.backup ? 'will' : 'will not'} be created before removal`);
+    ui.info('\nNote: this is a preview only. No files will be modified.');
   }
   
   /**
    * Confirms the removal operation with the user
    */
   private async confirm(providersWithServer: Array<{provider: AgentProvider; serverId: string}>, removalConfig: RemovalConfig): Promise<boolean> {
-    console.log('\n🗑️  Removal Summary');
-    console.log('='.repeat(40));
-    console.log('The following MCP server configuration will be removed:');
-    console.log(`  • Server ID: ${removalConfig.mcpServerId}`);
-    console.log('\nFrom these agents:');
-    providersWithServer.forEach(({provider}) => console.log(`  • ${provider.name}`));
+    ui.info('\n🗑️  Removal Summary');
+    ui.info('='.repeat(40));
+    ui.info('The following MCP server configuration will be removed:');
+    ui.info(`  • Server ID: ${removalConfig.mcpServerId}`);
+    ui.info('\nFrom these agents:');
+    providersWithServer.forEach(({provider}) => ui.info(`  • ${provider.name}`));
     
-    console.log('\n⚠️  Important:');
+    ui.info('\n⚠️  Important:');
     if (this.options.backup) {
-      console.log('  • Backup files will be created before removal');
-      console.log('  • This operation can be rolled back if needed');
+      ui.info('  • Backup files will be created before removal');
+      ui.info('  • This operation can be rolled back if needed');
     } else {
-      console.log('  • No backup files will be created (explicitly requested)');
-      console.log('  • Rollback will be limited or unavailable');
+      ui.info('  • No backup files will be created (explicitly requested)');
+      ui.info('  • Rollback will be limited or unavailable');
     }
-    console.log('  • Other MCP servers in these agents will not be affected');
+    ui.info('  • Other MCP servers in these agents will not be affected');
     
     const inquirer = await getInquirer();
     const { confirmed } = await inquirer.prompt([
@@ -346,7 +347,7 @@ export class RemoveCommand {
     removalConfig: RemovalConfig,
     providersWithServer: Array<{provider: AgentProvider; serverId: string}>
   ): Promise<void> {
-    console.log(`\n🗑️  Removing MCP server '${removalConfig.mcpServerId}' from ${providersWithServer.length} agent(s)...`);
+    ui.info(`\n🗑️  Removing MCP server '${removalConfig.mcpServerId}' from ${providersWithServer.length} agent(s)...`);
     
     // Get the actual provider instances
     const providersToRemoveFrom = providersWithServer.map(({provider}) => provider);
@@ -361,26 +362,26 @@ export class RemoveCommand {
     const removalSummary = this.summarizeRemovalResults(removalResults);
     
     if (removalSummary.successful > 0) {
-      console.log(`\n✅ Successfully removed from ${removalSummary.successful} agent(s):`);
+      ui.info(`\n✅ Successfully removed from ${removalSummary.successful} agent(s):`);
       for (const result of removalResults.filter(r => r.success)) {
-        console.log(`  • ${result.provider.name}`);
+        ui.info(`  • ${result.provider.name}`);
         if (result.backupPath) {
-          console.log(`    └─ Backup created: ${result.backupPath}`);
+          ui.info(`    └─ Backup created: ${result.backupPath}`);
         }
       }
     }
     
     if (removalSummary.notFound > 0) {
-      console.log(`\n⚠️  Server not found in ${removalSummary.notFound} agent(s):`);
+      ui.info(`\n⚠️  Server not found in ${removalSummary.notFound} agent(s):`);
       for (const result of removalResults.filter(r => !r.found)) {
-        console.log(`  • ${result.provider.name}`);
+        ui.info(`  • ${result.provider.name}`);
       }
     }
     
     if (removalSummary.failed > 0) {
-      console.log(`\n❌ Failed to remove from ${removalSummary.failed} agent(s):`);
+      ui.info(`\n❌ Failed to remove from ${removalSummary.failed} agent(s):`);
       for (const failed of removalResults.filter(r => !r.success && r.found)) {
-        console.log(`  • ${failed.provider.name}: ${failed.error || 'Unknown error'}`);
+        ui.info(`  • ${failed.provider.name}: ${failed.error || 'Unknown error'}`);
       }
       
       // Propagate error so callers/tests can handle as a rejected promise
@@ -388,24 +389,24 @@ export class RemoveCommand {
       throw new Error(firstError);
     }
     
-    console.log('\n✨ Removal complete!');
+    ui.info('\n✨ Removal complete!');
     
     // Show summary if any operations succeeded
     if (removalSummary.successful > 0) {
-      console.log('\n📋 Removal Summary:');
-      console.log('='.repeat(40));
-      console.log(`MCP server '${removalConfig.mcpServerId}' has been removed from:`);
+      ui.info('\n📋 Removal Summary:');
+      ui.info('='.repeat(40));
+      ui.info(`MCP server '${removalConfig.mcpServerId}' has been removed from:`);
       for (const result of removalResults.filter(r => r.success)) {
-        console.log(`  • ${result.provider.name}`);
+        ui.info(`  • ${result.provider.name}`);
       }
       
       // Show backup summary
       if (removalSummary.backupPaths.length > 0) {
-        console.log('\n💾 Backup Summary:');
-        console.log('='.repeat(40));
-        console.log('The following backup files were created:');
+        ui.info('\n💾 Backup Summary:');
+        ui.info('='.repeat(40));
+        ui.info('The following backup files were created:');
         for (const backup of removalSummary.backupPaths) {
-          console.log(`  • ${backup.provider}: ${backup.backupPath}`);
+          ui.info(`  • ${backup.provider}: ${backup.backupPath}`);
         }
       }
     }

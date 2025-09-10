@@ -28,23 +28,29 @@ export const WIZARD_BANNER = `
  * Apply gradient coloring to banner lines
  * @param lines Array of banner lines
  * @param style Color style ('main' or 'wizard')
- * @param chalk Chalk instance
  * @returns Colored banner string
  */
-export function colorizeBanner(lines: string[], style: 'main' | 'wizard' = 'main', chalk: any): string {
+import * as colors from 'yoctocolors-cjs';
+
+// 256-color ANSI helpers for richer palette (e.g., true orange)
+function color256(code: number, text: string, bold = true): string {
+  const b = bold ? '\x1b[1m' : '';
+  return `${b}\x1b[38;5;${code}m${text}\x1b[0m`;
+}
+
+export function colorizeBanner(lines: string[], style: 'main' | 'wizard' = 'main'): string {
   if (style === 'main') {
-    // Apply red to orange gradient coloring
+    // Use lighter/brighter red and orange via 256-color palette
+    // Bright red ~ 196; vivid orange ~ 214
+    const BRIGHT_RED = 196;
+    const ORANGE = 214;
     return lines.map((line, index) => {
-      // Alternate between red and orange for a gradient effect
-      if (index % 2 === 0) {
-        return chalk.red.bold(line);
-      } else {
-        return chalk.hex('#FFA500').bold(line); // Orange color
-      }
+      const code = (index % 2 === 0) ? BRIGHT_RED : ORANGE;
+      return color256(code, line, true);
     }).join('\n');
   } else {
     // Apply cyan coloring for wizard
-    return lines.map(line => chalk.bold.cyan(line)).join('\n');
+    return lines.map(line => colors.bold(colors.cyan(line))).join('\n');
   }
 }
 
@@ -66,9 +72,6 @@ export function centerText(text: string, width?: number): string {
  * @returns Formatted banner string
  */
 export async function getMainBanner(): Promise<string> {
-  // Dynamically import ESM-only chalk in CJS context
-  const { default: chalk } = await import('chalk');
-
   const lines = ALPH_BANNER
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
@@ -77,7 +80,7 @@ export async function getMainBanner(): Promise<string> {
     // Left-align banner (no centering per requested positioning)
     .map(l => l);
 
-  return colorizeBanner(lines, 'main', chalk);
+  return colorizeBanner(lines, 'main');
 }
 
 /**
@@ -86,8 +89,6 @@ export async function getMainBanner(): Promise<string> {
  * @returns Formatted banner string
  */
 export async function getWizardBanner(): Promise<string> {
-  const { default: chalk } = await import('chalk');
-
   const terminalWidth = process.stdout.columns || 80;
   const lines = WIZARD_BANNER
     .replace(/\r\n/g, '\n')
@@ -96,7 +97,7 @@ export async function getWizardBanner(): Promise<string> {
     .filter(l => l.trim().length > 0)
     .map(l => centerText(l, terminalWidth));
 
-  return colorizeBanner(lines, 'wizard', chalk);
+  return colorizeBanner(lines, 'wizard');
 }
 
 /**
@@ -117,32 +118,34 @@ export async function getAppVersion(): Promise<string> {
 /**
  * Display the main application banner
  */
+import { ui } from './ui';
+
 export async function showMainBanner(): Promise<void> {
-  console.log();
-  console.log(await getMainBanner());
-  console.log();
+  ui.info('');
+  ui.info(await getMainBanner());
+  ui.info('');
   
   // Left-aligned description (avoid centering)
   const description = 'Universal Remote MCP Server Manager';
-  console.log(description);
-  console.log();
+  ui.info(description);
+  ui.info('');
 }
 
 /**
  * Display the interactive wizard banner
  */
 export async function showWizardBanner(): Promise<void> {
-  console.log();
-  console.log(await getWizardBanner());
-  console.log();
+  ui.info('');
+  ui.info(await getWizardBanner());
+  ui.info('');
   
   // Centered description
   const terminalWidth = process.stdout.columns || 80;
   const description = 'Universal Remote MCP Server Manager';
-  console.log(centerText(description, terminalWidth));
-  console.log();
-  console.log('🚀 Welcome to the Alph Configuration Wizard');
-  console.log('─'.repeat(42));
-  console.log('Configure your AI agents to work with MCP servers');
-  console.log();
+  ui.info(centerText(description, terminalWidth));
+  ui.info('');
+  ui.info('🚀 Welcome to the Alph Configuration Wizard');
+  ui.info('─'.repeat(42));
+  ui.info('Configure your AI agents to work with MCP servers');
+  ui.info('');
 }

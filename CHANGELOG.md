@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2025-09-10
+
+### Added
+- 30-second try path: `npx @aqualia/alph-cli@latest` for instant usage without global install.
+- Global `--verbose` flag to enable additional debug output.
+
+### Changed
+- UI output centralized through a new `ui` utility (`src/utils/ui.ts`) for consistent formatting and future verbosity control.
+- Improved banner colors (brighter red/orange using 256-color ANSI) for a cleaner, modern look.
+- Status command output retained the enhanced formatting with clear sections and ANSI emphasis.
+
+### Removed
+- Replaced `chalk` (ESM-only) with `yoctocolors-cjs` to avoid ESM/CJS friction and simplify color usage across the CLI.
+
+### Docs
+- README: neutralized vendor-specific endpoints, added a "Try in 30 seconds" block, and documented compatibility.
+- Moved protocol examples into `docs/agents/protocol-examples.md`.
+- Started Docs IA tidy: internal-facing documents relocated under `docs/internal/`.
+
 ### Added
 - Local MCP proxy integration for Codex via Supergateway (STDIO ↔ Streamable HTTP/SSE).
 - New `alph proxy` commands: `run` and `health`.
