@@ -1,8 +1,56 @@
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import { execSync } from 'child_process';
+
 export type ProxyTransport = 'http' | 'sse';
 
 export interface ProxyHeader {
   key: string;
   value: string;
+}
+
+/**
+ * Ensure a local installation of supergateway exists and return its executable path.
+ * - Installs to installDir (defaults to ~/.alph-mcp)
+ * - Pins version if provided (e.g., "3.4.0"); otherwise installs latest
+ * - Returns absolute path to the shim:
+ *   - Windows: <installDir>\\node_modules\\.bin\\supergateway.cmd
+ *   - Others:  <installDir>/node_modules/.bin/supergateway
+ */
+export function ensureLocalSupergatewayBin(installDir?: string, version?: string): string {
+  const home = os.homedir();
+  const dir = installDir && installDir.trim() ? path.resolve(installDir) : path.join(home, '.alph-mcp');
+  const binRel = path.join('node_modules', '.bin', process.platform === 'win32' ? 'supergateway.cmd' : 'supergateway');
+  const binPath = path.join(dir, binRel);
+  const pkgJsonPath = path.join(dir, 'node_modules', 'supergateway', 'package.json');
+
+  // Create directory if needed
+  fs.mkdirSync(dir, { recursive: true });
+
+  // Check if already installed and matches version (when provided)
+  let needInstall = !fs.existsSync(binPath);
+  if (!needInstall && version) {
+    try {
+      const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8'));
+      const installed = String(pkg.version || '').trim();
+      if (installed !== version) needInstall = true;
+    } catch {
+      needInstall = true;
+    }
+  }
+
+  if (needInstall) {
+    const spec = version && version.trim() ? `supergateway@${version.trim()}` : 'supergateway';
+    const cmd = `npm i --prefix "${dir}" ${spec}`;
+    // Inherit env so proxies etc. are honored
+    execSync(cmd, { stdio: 'inherit', env: process.env });
+  }
+
+  if (!fs.existsSync(binPath)) {
+    throw new Error(`Failed to install supergateway locally at ${dir}`);
+  }
+  return binPath;
 }
 
 export interface ProxyOpts {

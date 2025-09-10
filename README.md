@@ -35,7 +35,11 @@ Alph CLI automates safe, repeatable MCP configuration across agents. It detects 
 - **Gemini CLI** (`~/.gemini/settings.json`)
 - **Cursor** (platform-specific configuration locations)
 - **Claude Code** (Claude-specific configuration format)
-- **Generic Provider** (custom configuration files)
+- **Windsurf** (IDE-specific configuration)
+- **Warp** (terminal configuration)
+- **Codex CLI** (TOML-based configuration)
+
+See detailed guides in [docs/agents](./docs/agents/README.md).
 
 ## Installation
 
@@ -172,6 +176,7 @@ Gemini (settings.json)
 - [CONTRIBUTING.md](./CONTRIBUTING.md) - how to contribute
 - [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) - community standards and enforcement
  - [docs/AGENT_HANDOFF.md](./docs/AGENT_HANDOFF.md) - concise, complete brief for agents and contributors
+ - [docs/agents](./docs/agents/README.md) - agent-specific configuration guides
 
 
 ## Code of Conduct
@@ -187,4 +192,3 @@ We follow the [Contributor Covenant v2.1](./CODE_OF_CONDUCT.md). By participatin
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
-

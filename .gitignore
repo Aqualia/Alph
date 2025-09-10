@@ -49,6 +49,10 @@ pids/
 # Temporary folders
 tmp/
 temp/
+tmp-e2e/
+
+# TypeScript build info
+*.tsbuildinfo
 
 # Legacy Go artifacts (keep for reference)
 askhumanctl

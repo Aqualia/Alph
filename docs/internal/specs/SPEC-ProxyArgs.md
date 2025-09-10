@@ -92,4 +92,3 @@ redactForLogs("Authorization: Bearer TEST_TOKEN_123")
 
 - Higher layers decide command selection (e.g., `npx -y supergateway` vs Docker) and timeouts.
 - Streamable HTTP is the default transport per MCP guidance; SSE remains supported for compatibility.
-

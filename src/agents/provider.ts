@@ -42,6 +42,18 @@ export interface AgentConfig {
   
   /** Optional custom configuration directory path */
   configDir?: string;
+
+  /**
+   * Prefer installing/using a local Supergateway binary instead of invoking via npx.
+   * Primarily intended to improve startup reliability on Windows (avoids npx timeouts/ENOENT).
+   */
+  preferLocalProxyBin?: boolean;
+
+  /**
+   * Optional directory to install proxy binaries (e.g., Supergateway) when preferLocalProxyBin is true.
+   * Defaults to ~/.alph-mcp (or %USERPROFILE%\.alph-mcp on Windows) if not provided.
+   */
+  proxyInstallDir?: string;
 }
 
 /**

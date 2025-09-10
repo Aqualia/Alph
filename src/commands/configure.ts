@@ -58,6 +58,11 @@ export interface ConfigureCommandOptions {
   proxyTransport?: 'http' | 'sse';
   proxyBearer?: string;
   proxyHeader?: string[]; // repeated "K: V"
+
+  /** Prefer installing/using a local Supergateway binary (esp. on Windows) */
+  preferLocalProxyBin?: boolean;
+  /** Directory to install local proxy binaries (default: ~/.alph-mcp) */
+  proxyInstallDir?: string;
 }
 
 /**
@@ -108,6 +113,12 @@ export class ConfigureCommand {
       noInstall: options.noInstall ?? (process.env['ALPH_NO_INSTALL'] === '1'),
       installManager: options.installManager ?? ((process.env['ALPH_INSTALL_MANAGER'] as any) || 'auto'),
       quiet: options.quiet ?? false,
+      preferLocalProxyBin: (options.preferLocalProxyBin !== undefined)
+        ? options.preferLocalProxyBin
+        : (process.platform === 'win32' || process.env['ALPH_PREFER_LOCAL_PROXY_BIN'] === '1'),
+      proxyInstallDir: (options.proxyInstallDir !== undefined)
+        ? options.proxyInstallDir
+        : (process.env['ALPH_PROXY_INSTALL_DIR'] ?? ''),
       proxyRemoteUrl: options.proxyRemoteUrl,
       proxyTransport: options.proxyTransport,
       proxyBearer: options.proxyBearer,
@@ -221,7 +232,9 @@ export class ConfigureCommand {
       args: this.options.args,
       cwd: this.options.cwd,
       ...(Number.isFinite(this.options.timeout) && this.options.timeout > 0 ? { timeout: this.options.timeout } : {}),
-      configDir: this.options.configDir
+      configDir: this.options.configDir,
+      ...(this.options.preferLocalProxyBin ? { preferLocalProxyBin: !!this.options.preferLocalProxyBin } : {}),
+      ...(this.options.proxyInstallDir ? { proxyInstallDir: this.options.proxyInstallDir } : {}),
     };
 
     // 4) Dry-run preview
@@ -569,7 +582,7 @@ export class ConfigureCommand {
   // Provider-specific preview mapping: show Codex as STDIO via Supergateway when remote proxy flags are used
   private async __mapConfigForPreview(providerName: string, config: AgentConfig): Promise<AgentConfig> {
     if (providerName === 'Codex CLI' && (config.transport === 'http' || config.transport === 'sse')) {
-      const { buildSupergatewayArgs } = await import('../utils/proxy.js');
+      const { buildSupergatewayArgs, ensureLocalSupergatewayBin } = await import('../utils/proxy.js');
       const headersRecord = config.headers || {};
       let bearer = config.mcpAccessKey;
       const authHeader = headersRecord['Authorization'] || (headersRecord as any)['authorization'];
@@ -586,11 +599,26 @@ export class ConfigureCommand {
         bearer,
         headers,
       });
+      const pin = process?.env?.['ALPH_PROXY_VERSION'] || '3.4.0';
+      const preferLocal = config.preferLocalProxyBin === true || (process.platform === 'win32' && config.preferLocalProxyBin !== false);
+      if (preferLocal) {
+        try {
+          const binPath = ensureLocalSupergatewayBin(config.proxyInstallDir, pin);
+          return {
+            ...config,
+            transport: 'stdio',
+            command: binPath,
+            args: argv,
+          };
+        } catch {
+          // fall through to npx
+        }
+      }
       return {
         ...config,
         transport: 'stdio',
         command: 'npx',
-        args: ['-y', 'supergateway', ...argv],
+        args: ['-y', `supergateway@${pin}`, ...argv],
       };
     }
     return config;

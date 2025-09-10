@@ -48,4 +48,3 @@ This runbook helps triage and resolve common issues when using Alph’s local pr
 - If timeout → Pre-warm `npx`, increase timeout; verify network.
 - If 401 → Add bearer/header; validate via `proxy health`.
 - If regression post-update → Pin older version; re-validate.
-

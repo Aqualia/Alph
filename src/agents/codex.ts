@@ -96,14 +96,27 @@ export class CodexProvider implements AgentProvider {
     const servers: Record<string, CodexTomlServer> = {
       ...(next.mcp_servers || {})
     };
+    // Normalize command for cross-platform compatibility (notably Windows)
+    // Many MCP clients spawn processes without a shell. On Windows, shims like
+    // npx/yarn/pnpm are distributed as .cmd files. If the command is provided
+    // as "npx" (or similar) without the .cmd extension, the child process may
+    // fail to locate the program and error with "program not found".
+    let normalizedCommand = config.command?.trim() || '';
+    if (process.platform === 'win32') {
+      const lower = normalizedCommand.toLowerCase();
+      // Add .cmd if missing for common package runners
+      if (lower === 'npx') normalizedCommand = 'npx.cmd';
+      if (lower === 'yarn') normalizedCommand = 'yarn.cmd';
+      if (lower === 'pnpm') normalizedCommand = 'pnpm.cmd';
+    }
 
-    const entry: CodexTomlServer = { command: config.command };
+    const entry: CodexTomlServer = { command: normalizedCommand };
     if (config.args && config.args.length > 0) entry.args = config.args;
     if (config.env && Object.keys(config.env).length > 0) entry.env = config.env;
     if (typeof config.timeout === 'number' && config.timeout > 0) entry.startup_timeout_ms = config.timeout;
 
     // Heuristic: npx/yarn dlx/pnpm dlx may need extra time on first run
-    const cmd = (config.command || '').toLowerCase();
+    const cmd = (normalizedCommand || '').toLowerCase();
     const firstArg = (config.args && config.args[0] || '').toLowerCase();
     const isNPX = cmd.endsWith('npx') || cmd.endsWith('npx.cmd');
     const isDLX = (cmd === 'yarn' || cmd.endsWith('yarn.cmd') || cmd === 'pnpm' || cmd.endsWith('pnpm.cmd')) && firstArg === 'dlx';

@@ -7,7 +7,7 @@
  */
 
 import { AgentProvider, AgentConfig, ProviderDetectionResult, ProviderConfigurationResult, RemovalConfig, ProviderRemovalResult } from './provider';
-import { buildSupergatewayArgs } from '../utils/proxy';
+import { buildSupergatewayArgs, ensureLocalSupergatewayBin } from '../utils/proxy';
 import { GeminiProvider } from './gemini';
 import { CursorProvider } from './cursor';
 import { ClaudeProvider } from './claude';
@@ -485,15 +485,41 @@ export class AgentRegistry {
 
       const pin = process?.env?.['ALPH_PROXY_VERSION'] || '3.4.0';
       const useDocker = (config.command || '').toLowerCase() === 'docker';
-      const mappedArgs = useDocker
-        ? ['run', '--rm', `ghcr.io/supercorp-ai/supergateway:${pin}`, ...argv]
-        : ['-y', `supergateway@${pin}`, ...argv];
 
+      // Prefer local binary on Windows by default or when explicitly requested
+      const preferLocal = config.preferLocalProxyBin === true || (process.platform === 'win32' && config.preferLocalProxyBin !== false);
+
+      if (useDocker) {
+        // Docker mapping unchanged
+        return {
+          ...config,
+          transport: 'stdio',
+          command: 'docker',
+          args: ['run', '--rm', `ghcr.io/supercorp-ai/supergateway:${pin}`, ...argv],
+        };
+      }
+
+      if (preferLocal) {
+        // Ensure local install and point directly to the .bin shim
+        try {
+          const binPath = ensureLocalSupergatewayBin(config.proxyInstallDir, pin);
+          return {
+            ...config,
+            transport: 'stdio',
+            command: binPath,
+            args: argv,
+          };
+        } catch (e) {
+          // Fall back to npx if local install fails for any reason
+        }
+      }
+
+      // Default: npx invocation (cross-platform), will be normalized to npx.cmd on Windows by Codex provider
       return {
         ...config,
         transport: 'stdio',
-        command: config.command || (useDocker ? 'docker' : 'npx'),
-        args: mappedArgs,
+        command: config.command || 'npx',
+        args: ['-y', `supergateway@${pin}`, ...argv],
       };
     }
     return config;

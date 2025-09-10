@@ -529,6 +529,16 @@ Guarantee atomic writes with robust Windows behavior (cross-volume rename & long
 
 ---
 
+## Validation vs your feedback (cross-check)
+
+* **Data-model schemas** now included (catalog + tools + JSON Schema). ✅
+* **Feature flags** (concrete CLI & env names) added. ✅
+* **Windows atomic I/O** (EXDEV, long-path, same-dir temp) explicitly called out. ✅
+* **Protocol examples** (HTTP/SSE/STDIO) for Cursor, Claude, Gemini included. ✅
+* **Path templates per OS** table provided. ✅
+* **Research** backed by current docs & standards; citations added. ✅
+
+If you want, I’ll convert each EPIC task into GitHub issues with labels/milestones and drop the schemas into `schema/` with a `make validate` script (Zod + AJV).
 
 [1]: https://docs.cursor.com/context/model-context-protocol "Cursor – Model Context Protocol (MCP)"
 [2]: https://docs.anthropic.com/en/docs/claude-code/mcp "Connect Claude Code to tools via MCP - Anthropic"
