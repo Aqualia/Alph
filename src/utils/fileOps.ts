@@ -112,9 +112,9 @@ export class FileOperations {
             this.defaultTimeout(),
             `atomicWrite.copyFile:${tempPath}->${resolvedPath}`
           );
-          try { const fh = await fs.open(resolvedPath, 'r+'); await fh.sync(); await fh.close(); } catch {}
+          try { const fh = await fs.open(resolvedPath, 'r+'); await fh.sync(); await fh.close(); } catch { /* noop */ }
           this.debug(`atomicWrite copy+sync completed in ${Date.now() - t1}ms for ${resolvedPath}`);
-          try { await fs.unlink(tempPath); } catch {}
+          try { await fs.unlink(tempPath); } catch { /* noop */ }
         };
 
         if (mode === 'copy') {

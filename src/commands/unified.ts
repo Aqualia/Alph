@@ -154,9 +154,12 @@ export class UnifiedCommand {
     // status subcommand
     this.program
       .command('status')
-      .description('📊 Show detected agents and current MCP entries')
-      .action(async () => {
-        await executeStatusCommand();
+      .description('Show detected agents and current MCP entries')
+      .option('--format <fmt>', 'Output format (list|json)', 'list')
+      .option('--agent <name>', 'Filter by agent name (contains)')
+      .option('--problems', 'Show only agents with issues', false)
+      .action(async (opts: { format?: 'list'|'json'; agent?: string; problems?: boolean }) => {
+        await executeStatusCommand({ format: (opts.format as any) || 'list', agent: (opts.agent || ''), problems: !!opts.problems });
       });
 
     // remove subcommand
@@ -289,3 +292,8 @@ export function __normalizeConfigureForwarding(rawOpts: any, argv: string[]) {
     agents,
   };
 }
+
+
+
+
+

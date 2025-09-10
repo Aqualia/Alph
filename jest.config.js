@@ -9,11 +9,13 @@ module.exports = {
     '**/*.integration.test.ts',
   ],
   setupFilesAfterEnv: ['<rootDir>/tests/jest.setup.js'],
-  globals: {
-    'ts-jest': {
-      tsconfig: '<rootDir>/tsconfig.test.json',
-      isolatedModules: true,
-    },
+  transform: {
+    '^.+\\.(ts|tsx)$': [
+      'ts-jest',
+      {
+        tsconfig: '<rootDir>/tsconfig.test.json'
+      },
+    ],
   },
   moduleFileExtensions: ['ts', 'js', 'json'],
   verbose: false,

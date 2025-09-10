@@ -60,7 +60,7 @@ export class CursorProvider implements AgentProvider {
    */
   private isLegacySettingsPath(p: string | null | undefined): boolean {
     if (!p) return false;
-    return /(^|[\/\\])settings\.json$/i.test(p);
+    return /(^|[/\\])settings\.json$/i.test(p);
   }
 
   /**

@@ -29,6 +29,7 @@ export class InteractiveConfigurator {
    */
   public async start(): Promise<void> {
     await this.showWelcomeMessage();
+    console.log('🧭 Step 1 of 3: Select agents');
     
     // 1. Detect available agents
     const detectedAgents = await this.detectAgents();
@@ -49,27 +50,28 @@ export class InteractiveConfigurator {
         selectedAgents = await this.selectAgents(detectedAgents);
       } else {
         console.log('\nUsing pre-selected agents:');
-        selectedAgents.forEach(a => console.log(`  \u0007 ${a}`));
+        selectedAgents.forEach(a => console.log(`  - ${a}`));
       }
     } else {
       selectedAgents = await this.selectAgents(detectedAgents);
     }
     if (selectedAgents.length === 0) {
-      console.log('\n? No agents selected. Exiting.');
+      console.log('\nNo agents selected. Exiting.');
       return;
     }
     
     // 3. Get MCP server configuration (supports pre-filled endpoint & access key)
+    console.log('\n🧰 Step 2 of 3: Configure server');
     const mcpConfig = await this.getMCPConfig(selectedAgents);
     if (!mcpConfig) {
-      console.log('\n? Configuration aborted.');
+      console.log('\nConfiguration aborted.');
       return;
     }
 
     // 3.5. Ask about config directory preference
     const configDirChoice = await this.getConfigDirectoryChoice();
     if (configDirChoice.cancelled) {
-      console.log('\n? Configuration cancelled.');
+      console.log('\nConfiguration cancelled.');
       return;
     }
     
@@ -77,9 +79,10 @@ export class InteractiveConfigurator {
     const backupPref = await this.getBackupPreference();
 
     // 4. Confirm configuration
+    console.log('\n📝 Step 3 of 3: Review & apply');
     const confirmed = await this.confirmConfiguration(selectedAgents, mcpConfig, backupPref);
     if (!confirmed) {
-      console.log('\n? Configuration cancelled.');
+      console.log('\nConfiguration cancelled.');
       return;
     }
     
@@ -93,8 +96,8 @@ export class InteractiveConfigurator {
   private async showWelcomeMessage(): Promise<void> {
     const { showMainBanner } = await import('../utils/banner.js');
     await showMainBanner();
-    console.log('?? Welcome to the Alph Configuration Wizard');
-    console.log('�'.repeat(42));
+    console.log('Welcome to the Alph Configuration Wizard');
+    console.log('-'.repeat(42));
     console.log('Configure your AI agents to work with MCP servers');
     console.log();
   }
@@ -103,7 +106,7 @@ export class InteractiveConfigurator {
    * Detects available agents on the system
    */
   private async detectAgents(): Promise<string[]> {
-    console.log('?? Detecting available AI agents...');
+    console.log('Detecting available AI agents...');
     
     const detectionResults = await defaultRegistry.detectAvailableAgents();
     const detectionSummary = defaultRegistry.summarizeDetectionResults(detectionResults);
@@ -112,17 +115,17 @@ export class InteractiveConfigurator {
       return [];
     }
     
-    console.log(`\n? Found ${detectionSummary.detected} AI agent(s):`);
+    console.log(`\nFound ${detectionSummary.detected} AI agent(s):`);
     detectionSummary.detectedProviders.forEach(provider => {
-      console.log(`  \u0007 ${provider}`);
+      console.log(`  - ${provider}`);
     });
     
     // Only show failed detections if there are any, but don't include them in the return
     if (detectionSummary.failed > 0) {
-      console.log(`\n??  ${detectionSummary.failed} agent(s) could not be detected:`);
+      console.log(`\n${detectionSummary.failed} agent(s) could not be detected:`);
       const failedDetections = defaultRegistry.getFailedDetections(detectionResults);
       failedDetections.forEach(failed => {
-        console.log(`  \u0007 ${failed.provider.name}: ${failed.error || 'Detection failed'}`);
+        console.log(`  - ${failed.provider.name}: ${failed.error || 'Detection failed'}`);
       });
     }
 
@@ -151,7 +154,7 @@ export class InteractiveConfigurator {
       {
         type: 'checkbox',
         name: 'selected',
-        message: 'Select which agents to configure:',
+        message: 'Select which agents to configure.\nAll detected agents are preselected; deselect any you don\'t want to configure.\nKeys: Space=toggle, Enter=continue, A=all, I=invert.',
         choices: detectedAgents.map(a => ({ name: a, value: a, checked: true })),
         pageSize: Math.min(10, detectedAgents.length),
         prefix: '?? '
@@ -174,7 +177,7 @@ export class InteractiveConfigurator {
         name: 'name',
         message: 'Give this MCP configuration a name:',
         default: 'default-server',
-        prefix: '?? ',
+        prefix: '> ',
         validate: (s: string) => !!s && /[A-Za-z0-9-_]/.test(s) || 'Name cannot be empty.'
       },
       {
@@ -187,7 +190,7 @@ export class InteractiveConfigurator {
           { name: 'Remote over SSE', value: 'sse' }
         ],
         default: (Array.isArray(selectedAgents) && selectedAgents.includes('Codex CLI')) ? 'stdio' : 'http',
-        prefix: '?? '
+        prefix: '> '
       },
       {
         type: 'input',
@@ -204,7 +207,7 @@ export class InteractiveConfigurator {
             type: 'password',
             name: 'bearer',
             message: 'Authentication Token (Optional):',
-            prefix: '?? ',
+            prefix: '> ',
             mask: '*',
             validate: () => true,
             suffix: ' (Leave blank for public servers)'
@@ -242,24 +245,49 @@ export class InteractiveConfigurator {
         message: 'Select a local MCP server tool to use:',
         choices: toolChoices,
         default: (Array.isArray(selectedAgents) && selectedAgents.includes('Codex CLI')) ? customChoice.value : (toolChoices[0]?.value ?? customChoice.value),
-        prefix: '?? '
+        prefix: '> '
       });
       if (toolId === '__custom__') {
         const custom = await inquirer.prompt([
-          { type: 'input', name: 'cmd', message: 'Command (e.g., npx):', prefix: '?? ', validate: (s: string) => !!s || 'Command is required.' },
-          { type: 'input', name: 'args', message: 'Arguments (comma or space separated):', prefix: '? ', default: '' }
+          { type: 'input', name: 'cmd', message: 'Command (e.g., npx):', prefix: '> ', validate: (s: string) => !!s || 'Command is required.' },
+          { type: 'input', name: 'args', message: 'Arguments (comma or space separated):', prefix: '> ', default: '' }
         ]);
         const args = (custom.args as string)
           .split(/[\s,]+/)
           .map(s => s.trim())
           .filter(Boolean);
+        // Advanced options (optional)
+        const { showAdvanced } = await inquirer.prompt({ type: 'confirm', name: 'showAdvanced', message: 'Configure advanced options (timeout, working directory, extra environment variables)?', default: false });
+        let advEnv: Record<string, string> | undefined;
+        let advCwd: string | undefined;
+        let advTimeout: number | undefined;
+        if (showAdvanced) {
+          const adv = await inquirer.prompt([
+            { type: 'input', name: 'cwd', message: 'Working directory (optional):', prefix: '> ', default: '' },
+            { type: 'input', name: 'timeout', message: 'Timeout ms (optional, e.g., 60000):', prefix: '> ', default: '' },
+            { type: 'input', name: 'envPairs', message: 'Extra env (key=value,comma-separated):', prefix: '> ', default: 'EXAMPLE_KEY=example' }
+          ]);
+          advCwd = String(adv.cwd || '').trim() || undefined;
+          const t = Number(String(adv.timeout || '').trim());
+          advTimeout = Number.isFinite(t) && t > 0 ? t : undefined;
+          const envPairs = String(adv.envPairs || '').split(',').map(s => s.trim()).filter(Boolean);
+          const env: Record<string, string> = {};
+          for (const pair of envPairs) {
+            const [k, v] = pair.split('=');
+            if (k && v) env[k.trim()] = v.trim();
+          }
+          advEnv = Object.keys(env).length > 0 ? env : undefined;
+        }
         return {
           name: answers['name'],
           command: custom.cmd,
           args,
           transport: 'stdio',
           disabled: false,
-          autoApprove: []
+          autoApprove: [],
+          ...(advEnv ? { env: advEnv } : {}),
+          ...(advCwd ? { cwd: advCwd } : {}),
+          ...(advTimeout ? { timeout: advTimeout } : {})
         };
       }
       
@@ -268,7 +296,7 @@ export class InteractiveConfigurator {
       if (!det.installed) {
         const optOut = (this.options as any)['noInstall'] === true || process.env['ALPH_NO_INSTALL'] === '1';
         if (optOut) {
-          console.log('\n??  STDIO tool not found and installation is disabled (--no-install or ALPH_NO_INSTALL=1).');
+          console.log('\nSTDIO tool not found and installation is disabled (--no-install or ALPH_NO_INSTALL=1).');
           throw new Error('Aborting: STDIO tool is not installed. Re-run without --no-install to install automatically.');
         }
         await installTool(tool, (this.options as any)['installManager']);
@@ -278,12 +306,24 @@ export class InteractiveConfigurator {
         }
       }
       let invoke = chooseDefaultInvocation(tool, det);
+      // Offer quick recommended settings path if a tool is selected and detected
+      const { quick } = await inquirer.prompt({ type: 'confirm', name: 'quick', message: 'Use recommended settings?', default: true });
+      if (quick) {
+        return {
+          name: answers['name'],
+          command: invoke.command,
+          args: invoke.args,
+          transport: 'stdio',
+          disabled: false,
+          autoApprove: []
+        };
+      }
       // Offer customization of command/args after detection
       const { customize } = await inquirer.prompt({ type: 'confirm', name: 'customize', message: 'Customize command/args?', default: (Array.isArray(selectedAgents) && selectedAgents.includes('Codex CLI')) });
       if (customize) {
         const edited = await inquirer.prompt([
-          { type: 'input', name: 'cmd', message: 'Command:', prefix: '?? ', default: invoke.command, validate: (s: string) => !!s || 'Command is required.' },
-          { type: 'input', name: 'args', message: 'Arguments (comma or space separated):', prefix: '? ', default: (invoke.args || []).join(' ') }
+          { type: 'input', name: 'cmd', message: 'Command:', prefix: '> ', default: invoke.command, validate: (s: string) => !!s || 'Command is required.' },
+          { type: 'input', name: 'args', message: 'Arguments (comma or space separated):', prefix: '> ', default: (invoke.args || []).join(' ') }
         ]);
         const args = (edited.args as string)
           .split(/[\s,]+/)
@@ -357,13 +397,38 @@ export class InteractiveConfigurator {
           env: envAnswers
         } as any;
       }
+      // Advanced options (optional)
+      const { showAdvanced } = await inquirer.prompt({ type: 'confirm', name: 'showAdvanced', message: 'Configure advanced options (timeout, working directory, extra environment variables)?', default: false });
+      let advEnv2: Record<string, string> | undefined;
+      let advCwd2: string | undefined;
+      let advTimeout2: number | undefined;
+      if (showAdvanced) {
+        const adv = await inquirer.prompt([
+          { type: 'input', name: 'cwd', message: 'Working directory (optional):', prefix: '> ', default: '' },
+          { type: 'input', name: 'timeout', message: 'Timeout ms (optional, e.g., 60000):', prefix: '> ', default: '' },
+          { type: 'input', name: 'envPairs', message: 'Extra env (key=value,comma-separated):', prefix: '> ', default: 'EXAMPLE_KEY=example' }
+        ]);
+        advCwd2 = String(adv.cwd || '').trim() || undefined;
+        const t = Number(String(adv.timeout || '').trim());
+        advTimeout2 = Number.isFinite(t) && t > 0 ? t : undefined;
+        const envPairs = String(adv.envPairs || '').split(',').map(s => s.trim()).filter(Boolean);
+        const env: Record<string, string> = {};
+        for (const pair of envPairs) {
+          const [k, v] = pair.split('=');
+          if (k && v) env[k.trim()] = v.trim();
+        }
+        advEnv2 = Object.keys(env).length > 0 ? env : undefined;
+      }
       return {
         name: answers['name'],
         command: invoke.command,
         args: invoke.args,
         transport: 'stdio',
         disabled: false,
-        autoApprove: []
+        autoApprove: [],
+        ...(advEnv2 ? { env: advEnv2 } : {}),
+        ...(advCwd2 ? { cwd: advCwd2 } : {}),
+        ...(advTimeout2 ? { timeout: advTimeout2 } : {})
       };
     } else {
       // Ensure HTTPS prefix is added to the URL if missing
@@ -371,12 +436,33 @@ export class InteractiveConfigurator {
       if (httpUrl && !httpUrl.startsWith('http://') && !httpUrl.startsWith('https://')) {
         httpUrl = `https://${httpUrl}`;
       }
+      // Advanced options for HTTP/SSE (optional)
+      const { showAdvanced } = await inquirer.prompt({ type: 'confirm', name: 'showAdvanced', message: 'Configure advanced options (timeout, extra HTTP headers)?', default: false });
+      let advHeaders: Record<string, string> | undefined;
+      let advTimeout3: number | undefined;
+      if (showAdvanced) {
+        const adv = await inquirer.prompt([
+          { type: 'input', name: 'timeout', message: 'Timeout ms (optional, e.g., 30000):', prefix: '> ', default: '' },
+          { type: 'input', name: 'headersPairs', message: 'Extra headers (key=value,comma-separated):', prefix: '> ', default: 'X-Example=1' }
+        ]);
+        const t = Number(String(adv.timeout || '').trim());
+        advTimeout3 = Number.isFinite(t) && t > 0 ? t : undefined;
+        const headerPairs = String(adv.headersPairs || '').split(',').map(s => s.trim()).filter(Boolean);
+        const headers: Record<string, string> = {};
+        for (const pair of headerPairs) {
+          const [k, v] = pair.split('=');
+          if (k && v) headers[k.trim()] = v.trim();
+        }
+        advHeaders = Object.keys(headers).length > 0 ? headers : undefined;
+      }
       return {
         name: answers['name'],
         httpUrl: httpUrl,
         transport: answers['transport'],
         disabled: false,
-        autoApprove: []
+        autoApprove: [],
+        ...(advHeaders ? { headers: advHeaders } : {}),
+        ...(advTimeout3 ? { timeout: advTimeout3 } : {})
       };
     }
   }
@@ -391,8 +477,8 @@ export class InteractiveConfigurator {
       name: 'choice',
       message: 'Where would you like to store the MCP server configuration?',
       choices: [
-        { name: '?? Global (default agent config locations)', value: 'global' },
-        { name: '?? Project-specific directory', value: 'project' }
+        { name: 'Global (default agent config locations)', value: 'global' },
+        { name: 'Project-specific directory', value: 'project' }
       ],
       default: 'global'
     });
@@ -444,28 +530,28 @@ export class InteractiveConfigurator {
     mcpConfig: MCPServerConfig,
     backup: boolean
   ): Promise<boolean> {
-    console.log('\n?? Configuration Summary');
+    console.log('\nConfiguration Summary');
     console.log('='.repeat(50));
     console.log('Review your settings before applying changes:');
     
-    console.log('\n?? Selected AI Agents:');
-    agents.forEach(agent => console.log(`  \u0007 ${agent}`));
+    console.log('\nSelected AI Agents:');
+    agents.forEach(agent => console.log(`  - ${agent}`));
     
-    console.log('\n?? MCP Server Configuration:');
-    console.log(`  \u0007 Name: ${mcpConfig.name}`);
+    console.log('\nMCP Server Configuration:');
+    console.log(`  - Name: ${mcpConfig.name}`);
     const endpointDisplay = mcpConfig.transport === 'stdio' ? 'Local (STDIO)' : (mcpConfig.httpUrl || '');
-    console.log(`  \u0007 Endpoint: ${endpointDisplay}`);
-    console.log(`  \u0007 Transport: ${mcpConfig.transport}`);
+    console.log(`  - Endpoint: ${endpointDisplay}`);
+    console.log(`  - Transport: ${mcpConfig.transport}`);
     if (this.options.bearer) {
       const token = this.options.bearer;
       const last4 = token.slice(-4);
-      console.log(`  \u0007 Authentication Token: ****${last4} (redacted)`);
+      console.log(`  - Authentication Token: ****${last4} (redacted)`);
     }
     
     // Configuration details
-    console.log('\n?? Configuration Details:');
-    console.log('  \u0007 Changes are atomic with automatic rollback support');
-    console.log(`  \u0007 Backups: ${backup ? 'Enabled' : 'Disabled'}`);
+    console.log('\nConfiguration Details:');
+    console.log('  - Changes are atomic with automatic rollback support');
+    console.log(`  - Backups: ${backup ? 'Enabled' : 'Disabled'}`);
     
     const inquirer = await getInquirer();
     const { confirmed } = await inquirer.prompt({
@@ -487,9 +573,8 @@ private async applyConfiguration(
   configDir?: string,
   backup?: boolean
 ): Promise<void> {
-console.log('\n?? Applying configuration...');
 // Default transport
-  let transport = mcpConfig.transport || 'http';
+  const transport = mcpConfig.transport || 'http';
   
   const commandOptions: ConfigureCommandOptions = {
     ...(mcpConfig.httpUrl ? { mcpServerEndpoint: mcpConfig.httpUrl } : {}),
@@ -499,7 +584,9 @@ console.log('\n?? Applying configuration...');
     // Skip secondary confirmation since wizard already confirmed
     yes: true,
     // Explicitly set interactive to false to prevent loop
-    interactive: false
+    interactive: false,
+    // Quiet output: show only the final summary
+    quiet: true
   };
   // For STDIO flows, pass command/args to provider configuration
   if (transport === 'stdio') {
@@ -532,7 +619,7 @@ options: ConfigureCommandOptions = {}
 ): Promise<void> {
   // Set up graceful exit handling
   const handleExit = () => {
-    console.log('\n\n?? Setup cancelled. Goodbye!');
+    console.log('\n\nSetup cancelled. Goodbye!');
     process.exit(0);
   };
 
@@ -550,11 +637,11 @@ options: ConfigureCommandOptions = {}
       error.message.includes('canceled') ||
       error.message.includes('cancelled')
     )) {
-      console.log('\n\n?? Setup cancelled. Goodbye!');
+      console.log('\n\nSetup cancelled. Goodbye!');
       process.exit(0);
     }
 
-    console.error('\n? Error during interactive configuration:');
+    console.error('\nError during interactive configuration:');
     console.error(error instanceof Error ? error.message : 'Unknown error');
 
     // Re-throw so integration tests and callers can handle failures

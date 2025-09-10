@@ -11,7 +11,9 @@ import type { GeminiConfig, CursorConfig, ClaudeConfig, GenericConfig } from '..
 import type { ProviderDetectionResult } from '../agents/provider';
 
 export interface StatusCommandOptions {
-  // Simplified - no agents or output options
+  format?: 'list' | 'json';
+  agent?: string;
+  problems?: boolean;
 }
 
 type AnyConfig = GeminiConfig | CursorConfig | ClaudeConfig | GenericConfig | Record<string, unknown>;
@@ -29,15 +31,20 @@ interface ProviderStatus {
   servers?: RedactedServerEntry[];
 }
 
-export async function executeStatusCommand(_options: StatusCommandOptions = {}): Promise<void> {
-  // Simplified - detect all available agents without filtering
+export async function executeStatusCommand(options: StatusCommandOptions = {}): Promise<void> {
   const detectionResults = await defaultRegistry.detectAvailableAgents();
+  const agentFilter = (options.agent || '').toLowerCase();
+  const filtered = agentFilter
+    ? detectionResults.filter(d => d.provider.name.toLowerCase().includes(agentFilter))
+    : detectionResults;
 
-  // Read configuration files for detected providers in parallel
-  const providerStatuses: ProviderStatus[] = await buildProviderStatuses(detectionResults);
-
-  // Always use table output
-  printTable(providerStatuses);
+  const providerStatuses: ProviderStatus[] = await buildProviderStatuses(filtered);
+  const format = (options.format || 'list');
+  if (format === 'json') {
+    console.log(JSON.stringify(providerStatuses, null, 2));
+    return;
+  }
+  printList(providerStatuses, options);
 }
 
 async function buildProviderStatuses(detections: ProviderDetectionResult[]): Promise<ProviderStatus[]> {
@@ -167,42 +174,49 @@ function structuredCloneSafe<T>(v: T): T {
   return JSON.parse(JSON.stringify(v));
 }
 
-function printTable(statuses: ProviderStatus[]): void {
+
+function printList(statuses: ProviderStatus[], options: StatusCommandOptions): void {
   console.log('\nAlph MCP Configuration Status');
   console.log('----------------------------------------\n');
 
-  if (statuses.length === 0) {
-    // eslint-disable-next-line no-console
+  let detectedProviders = statuses.filter(s => s.detected);
+  let notDetectedProviders = statuses.filter(s => !s.detected);
+
+  const hasServerProblem = (entry: RedactedServerEntry): boolean => {
+    const c = entry.config as any;
+    const explicit: string | undefined = c.transport || c.config?.transport;
+    let inferred: 'http' | 'sse' | 'stdio' | 'N/A' = 'N/A';
+    if (!explicit) {
+      if (typeof c.command === 'string' && c.command.length > 0) inferred = 'stdio';
+      else if (typeof c.httpUrl === 'string' && c.httpUrl.length > 0) inferred = 'http';
+      else if (typeof c.url === 'string' && c.url.length > 0) inferred = 'sse';
+    }
+    const transport = (explicit as string | undefined) || inferred;
+    if (transport === 'stdio') return !(typeof c.command === 'string' && c.command.length > 0);
+    if (transport === 'http') return !(typeof c.httpUrl === 'string' && c.httpUrl.length > 0);
+    if (transport === 'sse') return !(typeof c.url === 'string' && c.url.length > 0);
+    return false;
+  };
+
+  if (options.problems) {
+    detectedProviders = detectedProviders.filter(s => (s.error && s.error.length > 0) || (s.servers || []).some(hasServerProblem));
+  }
+
+  if (detectedProviders.length === 0 && notDetectedProviders.length === 0) {
     console.log('No AI agents found.');
     return;
   }
 
-  // Separate detected and non-detected providers
-  const detectedProviders = statuses.filter(s => s.detected);
-  const notDetectedProviders = statuses.filter(s => !s.detected);
-
-  // Display detected providers with their configurations
   if (detectedProviders.length > 0) {
-    // eslint-disable-next-line no-console
-    console.log('\x1b[1;32m✓ CONFIGURED AGENTS\x1b[0m');
-    console.log('─────────────────');
+    console.log('\x1b[1;32m✅ CONFIGURED AGENTS\x1b[0m');
     for (const s of detectedProviders) {
       const count = s.servers?.length ?? 0;
       const serverText = count === 1 ? '1 server' : `${count} servers`;
-      
-      // eslint-disable-next-line no-console
       console.log(`\n\x1b[1m${s.name}\x1b[0m (${serverText})`);
-      // eslint-disable-next-line no-console
       console.log(`  Config file: ${s.configPath || 'N/A'}`);
-
       if (count > 0) {
-    console.log('  MCP Servers:');
         for (const entry of s.servers!) {
           const c = entry.config as any;
-          const url = c.httpUrl || c.url || c.endpoint || c.command || 'N/A';
-          const disabled = c.disabled === true ? 'disabled' : 'enabled';
-
-          // Determine transport: prefer explicit, else infer; map stdio to N/A for display
           const explicit: string | undefined = c.transport || c.config?.transport;
           let inferred: 'http' | 'sse' | 'stdio' | 'N/A' = 'N/A';
           if (!explicit) {
@@ -211,37 +225,28 @@ function printTable(statuses: ProviderStatus[]): void {
             else if (typeof c.url === 'string' && c.url.length > 0) inferred = 'sse';
           }
           const rawTransport = (explicit as string | undefined) || inferred;
-          const transportDisplay = rawTransport === 'stdio' || rawTransport === 'N/A' || !rawTransport ? 'N/A' : rawTransport;
-          
-          // eslint-disable-next-line no-console
-          console.log(`    • \x1b[1m${entry.id}\x1b[0m: ${url}`);
-          // eslint-disable-next-line no-console
-          console.log(`      Status: ${disabled} | Transport: ${transportDisplay}`);
+          const endpoint = rawTransport === 'stdio' ? 'Local (STDIO)' : (c.httpUrl || c.url || 'N/A');
+          const status = c.disabled === true ? 'disabled' : 'enabled';
+          console.log(`  • \x1b[1m${entry.id}\x1b[0m — Endpoint: ${endpoint}; Transport: ${rawTransport || 'N/A'}; Status: ${status}`);
         }
       } else {
-        // eslint-disable-next-line no-console
-        console.log('  MCP Servers: None configured');
+        console.log('  • MCP Servers: None configured');
       }
     }
   }
 
-  // Display non-detected providers
   if (notDetectedProviders.length > 0) {
-    if (detectedProviders.length > 0) {
-      // eslint-disable-next-line no-console
-      console.log('\n');
-    }
-    
-    // eslint-disable-next-line no-console
+    if (detectedProviders.length > 0) console.log('');
     console.log('\x1b[1;33m⚠️  UNAVAILABLE AGENTS\x1b[0m');
-    console.log('───────────────────');
     for (const s of notDetectedProviders) {
       const errorText = s.error ? ` (${s.error})` : '';
-      // eslint-disable-next-line no-console
       console.log(`\n\x1b[1m${s.name}\x1b[0m: Not detected${errorText}`);
     }
   }
 
-  // eslint-disable-next-line no-console
   console.log('\n');
 }
+
+
+
+

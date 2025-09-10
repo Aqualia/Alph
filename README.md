@@ -165,12 +165,13 @@ Gemini (settings.json)
 
 ## Documentation
 
-- [ARCHITECTURE.md](./ARCHITECTURE.md) — codebase structure and execution flows
-- [SECURITY.md](./SECURITY.md) — security model, secret handling, backups/rollback
-- [USER_GUIDE.md](./USER_GUIDE.md) — usage examples and command reference
-- [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) — common issues and resolutions
-- [CONTRIBUTING.md](./CONTRIBUTING.md) — how to contribute
-- [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) — community standards and enforcement
+- [ARCHITECTURE.md](./ARCHITECTURE.md) - codebase structure and execution flows
+- [SECURITY.md](./SECURITY.md) - security model, secret handling, backups/rollback
+- [USER_GUIDE.md](./USER_GUIDE.md) - usage examples and command reference
+- [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) - common issues and resolutions
+- [CONTRIBUTING.md](./CONTRIBUTING.md) - how to contribute
+- [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) - community standards and enforcement
+ - [docs/AGENT_HANDOFF.md](./docs/AGENT_HANDOFF.md) - concise, complete brief for agents and contributors
 
 
 ## Code of Conduct

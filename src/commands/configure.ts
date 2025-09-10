@@ -50,6 +50,8 @@ export interface ConfigureCommandOptions {
   noInstall?: boolean;
   /** Preferred installer for STDIO tools */
   installManager?: 'npm' | 'brew' | 'pipx' | 'cargo' | 'auto';
+  /** Quiet output (suppress info banners; show only final summary) */
+  quiet?: boolean;
 }
 
 /**
@@ -98,7 +100,8 @@ export class ConfigureCommand {
       timeout: options.timeout ?? 0,
       backup: options.backup ?? true,
       noInstall: options.noInstall ?? (process.env['ALPH_NO_INSTALL'] === '1'),
-      installManager: options.installManager ?? ((process.env['ALPH_INSTALL_MANAGER'] as any) || 'auto')
+      installManager: options.installManager ?? ((process.env['ALPH_INSTALL_MANAGER'] as any) || 'auto'),
+      quiet: options.quiet ?? false
     } as Required<ConfigureCommandOptions>;
   }
   
@@ -113,8 +116,10 @@ export class ConfigureCommand {
    */
   public async execute(): Promise<void> {
     this.validateOptions();
-    const { logger } = await import('../logger.js');
-    logger.logStructured('info', { message: 'configure:start', context: { transport: this.options.transport, agents: this.options.agents } });
+    if (!this.options.quiet) {
+      const { logger } = await import('../logger.js');
+      logger.logStructured('info', { message: 'configure:start', context: { transport: this.options.transport, agents: this.options.agents } });
+    }
 
     // Interactive path or default with no flags
     const noFlags = !this.options.mcpServerEndpoint && !this.options.bearer && !this.options.agents && !this.options.dryRun && !this.options.yes;
@@ -141,7 +146,7 @@ export class ConfigureCommand {
     const providerFilter = valid.length > 0 ? valid : undefined;
     
     // Only show detection message if not in interactive mode
-    if (!this.options.interactive) {
+    if (!this.options.interactive && !this.options.quiet) {
       console.log('\n[INFO] Detecting available AI agents...');
     }
     
@@ -166,7 +171,7 @@ export class ConfigureCommand {
     }
 
     // 3) Build AgentConfig for providers
-    let transport = this.options.transport;
+    const transport = this.options.transport;
     // Apply default header policy if bearer present
     const computedHeaders: Record<string, string> = { ...(this.options.headers || {}) };
     if (this.options.bearer && (transport === 'http' || transport === 'sse')) {
@@ -192,7 +197,10 @@ export class ConfigureCommand {
     // 4) Dry-run preview
     if (this.options.dryRun) {
       this.printDryRunPreview(detectedProviders.map(p => p.name), agentConfig);
-      logger.logStructured('info', { message: 'configure:dry-run', context: { providers: detectedProviders.map(p => p.name) } });
+      if (!this.options.quiet) {
+        const { logger } = await import('../logger.js');
+        logger.logStructured('info', { message: 'configure:dry-run', context: { providers: detectedProviders.map(p => p.name) } });
+      }
       return;
     }
 
@@ -488,7 +496,6 @@ export class ConfigureCommand {
     const endpointDisplay = (agentConfig.transport === 'stdio') ? 'Local (STDIO)' : (agentConfig.mcpServerUrl || '');
     console.log(`  Endpoint: ${endpointDisplay}`);
     console.log(`  • ID: ${agentConfig.mcpServerId}`);
-    console.log(`  • URL: ${agentConfig.mcpServerUrl}`);
     console.log(`  • Transport: ${agentConfig.transport}`);
     if (agentConfig.mcpAccessKey) {
       console.log(`  • Access Key: ${this.redact(agentConfig.mcpAccessKey)} (redacted)`);
@@ -505,7 +512,6 @@ export class ConfigureCommand {
     const endpointDisplay2 = (agentConfig.transport === 'stdio') ? 'Local (STDIO)' : (agentConfig.mcpServerUrl || '');
     console.log(`  Endpoint: ${endpointDisplay2}`);
     console.log(`  • ID: ${agentConfig.mcpServerId}`);
-    console.log(`  • Endpoint: ${agentConfig.mcpServerUrl}`);
     console.log(`  • Transport: ${agentConfig.transport}`);
     if (agentConfig.mcpAccessKey) {
       console.log(`  • Access Key: ${this.redact(agentConfig.mcpAccessKey)} (redacted)`);
@@ -533,3 +539,13 @@ export async function executeConfigureCommand(options: ConfigureCommandOptions =
     throw (error instanceof Error ? error : new Error(String(error)));
   }
 }
+
+
+
+
+
+
+
+
+
+

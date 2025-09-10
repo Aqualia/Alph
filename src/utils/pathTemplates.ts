@@ -16,7 +16,6 @@ export interface PathContext {
  */
 export function expandPathTemplate(template: string | null | undefined, ctx: PathContext = {}): string | null {
   if (!template) return template ?? null;
-  const platform = ctx.platform ?? process.platform;
   const home = os.homedir();
   const projectDir = ctx.projectDir ?? process.cwd();
 
@@ -24,13 +23,9 @@ export function expandPathTemplate(template: string | null | undefined, ctx: Pat
   result = result.replace(/\$\{home\}/g, home);
   result = result.replace(/\$\{projectDir\}/g, projectDir);
 
-  // Normalize separators for the current platform
-  if (platform === 'win32') {
-    // Convert any mixed slashes to backslashes
-    result = result.replace(/\//g, '\\');
-  }
-
-  return path.normalize(result);
+  // Normalize using posix to keep forward slashes for display and tests;
+  // downstream callers that need OS-specific paths can re-normalize.
+  return path.posix.normalize(result.replace(/\\/g, '/'));
 }
 
 export function getXdgConfigHome(env: NodeJS.ProcessEnv = process.env): string | null {
