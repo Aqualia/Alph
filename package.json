@@ -33,7 +33,8 @@
     "prepublishOnly": "npm run build && npm run assets:banner",
     "audit": "npm audit",
     "audit:fix": "npm audit fix",
-    "audit:ci": "npm audit --audit-level=moderate"
+    "audit:ci": "npm audit --audit-level=moderate",
+    "drills:rollback": "jest tests/integration/drills.rollback.integration.test.ts"
   },
   "files": [
     "dist/**/*",

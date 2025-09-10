@@ -54,6 +54,8 @@ alph remove [options]
 
 ## Command Reference
 
+## Command Reference
+
 ```text
 alph setup [options]
       --mcp-server-endpoint <url>   MCP server endpoint URL
@@ -126,6 +128,38 @@ alph remove --server-name your-server-name --dry-run
 
 # Remove server without creating a backup (use with caution)
 alph remove --server-name your-server-name --no-backup -y
+
+### Codex: Remote MCP via Local Proxy
+
+Codex CLI supports STDIO only. Alph bridges remote MCP via a local Supergateway proxy:
+
+- Preferred transport: Streamable HTTP; SSE supported for compatibility.
+- Default pin: `supergateway@3.4.0` (override with `ALPH_PROXY_VERSION` or `alph proxy run --proxy-version`).
+
+Examples
+
+```bash
+# HTTP (Streamable) via local proxy
+alph setup --agents Codex \
+  --proxy-transport http \
+  --proxy-remote-url https://mcp.example.com/mcp \
+  --yes
+
+# SSE via local proxy
+alph setup --agents Codex \
+  --proxy-transport sse \
+  --proxy-remote-url https://mcp.example.com/sse \
+  --yes
+
+# Pin override for health preview
+ALPH_PROXY_VERSION=3.2.0 alph proxy health --remote-url https://mcp.example.com/mcp --transport http
+```
+
+Notes
+
+- Windows first-run is pre‑warmed (`npx -y supergateway --help`).
+- Codex entries with generic runners get `startup_timeout_ms = 60000` unless you set a custom value.
+- Previews and logs redact tokens and sensitive headers.
 
 ## STDIO Local Tools (Default-Enabled)
 
@@ -259,3 +293,4 @@ If you run into issues with `alph`:
 *   **Permissions:** Verify write access to configuration directories.
 *   **Async.link endpoint:** Confirm the server ID is valid and reachable.
 *   **Open an issue:** https://github.com/Aqualia/Alph/issues
+

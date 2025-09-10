@@ -170,7 +170,7 @@ export async function spawnAlphCli(
   } else {
     // Use ts-node for development
     const srcPath = path.resolve(__dirname, '../../src/index.ts');
-    return spawnWithCapture('npx', ['ts-node', srcPath, ...args], {
+    return spawnWithCapture('node', ['-r', 'ts-node/register', srcPath, ...args], {
       ...options,
       cwd: options.cwd || path.resolve(__dirname, '../..')
     });

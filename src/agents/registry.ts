@@ -7,6 +7,7 @@
  */
 
 import { AgentProvider, AgentConfig, ProviderDetectionResult, ProviderConfigurationResult, RemovalConfig, ProviderRemovalResult } from './provider';
+import { buildSupergatewayArgs } from '../utils/proxy';
 import { GeminiProvider } from './gemini';
 import { CursorProvider } from './cursor';
 import { ClaudeProvider } from './claude';
@@ -435,7 +436,9 @@ export class AgentRegistry {
   ): Promise<ProviderConfigurationResult> {
     let timeoutId: NodeJS.Timeout | undefined;
     try {
-      const configurationPromise = provider.configure(config, backup);
+      // Provider-specific mapping: Codex requires STDIO. If user selected http/sse, bridge via Supergateway.
+      const effectiveConfig = this.__mapConfigForProvider(provider, config);
+      const configurationPromise = provider.configure(effectiveConfig, backup);
       const timeoutPromise = new Promise<never>((_, reject) => {
         timeoutId = setTimeout(() => reject(new Error('Configuration timeout')), this.options.configurationTimeout);
       });
@@ -456,6 +459,44 @@ export class AgentRegistry {
     } finally {
       if (timeoutId) clearTimeout(timeoutId);
     }
+  }
+
+  // Map remote transports to local STDIO invocation for providers that require it (e.g., Codex CLI)
+  private __mapConfigForProvider(provider: AgentProvider, config: AgentConfig): AgentConfig {
+    if (provider.name === 'Codex CLI' && (config.transport === 'http' || config.transport === 'sse')) {
+      const headersRecord = config.headers || {};
+      // Prefer explicit access key; fallback to Authorization header if present
+      let bearer = config.mcpAccessKey;
+      const authHeader = headersRecord['Authorization'] || headersRecord['authorization'];
+      if (!bearer && typeof authHeader === 'string') {
+        const m = authHeader.match(/Bearer\s+(.+)/i);
+        if (m) bearer = m[1];
+      }
+      const headers = Object.entries(headersRecord)
+        .filter(([k]) => k.toLowerCase() !== 'authorization')
+        .map(([key, value]) => ({ key, value: String(value) }));
+
+      const argv = buildSupergatewayArgs({
+        remoteUrl: config.mcpServerUrl || '',
+        transport: config.transport,
+        bearer,
+        headers,
+      });
+
+      const pin = process?.env?.['ALPH_PROXY_VERSION'] || '3.4.0';
+      const useDocker = (config.command || '').toLowerCase() === 'docker';
+      const mappedArgs = useDocker
+        ? ['run', '--rm', `ghcr.io/supercorp-ai/supergateway:${pin}`, ...argv]
+        : ['-y', `supergateway@${pin}`, ...argv];
+
+      return {
+        ...config,
+        transport: 'stdio',
+        command: config.command || (useDocker ? 'docker' : 'npx'),
+        args: mappedArgs,
+      };
+    }
+    return config;
   }
 
   /**

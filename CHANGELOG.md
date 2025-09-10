@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Local MCP proxy integration for Codex via Supergateway (STDIO ↔ Streamable HTTP/SSE).
+- New `alph proxy` commands: `run` and `health`.
+- Proxy version pinning (default `supergateway@3.4.0`), override via `--proxy-version` or `ALPH_PROXY_VERSION`.
+- Non-interactive proxy flags in `alph setup`: `--proxy-remote-url`, `--proxy-transport`, `--proxy-bearer`, `--proxy-header`.
+- Pre-warm step for Windows (`npx -y supergateway --help`) and 60s startup heuristic for `npx`.
+- Redaction improvements across previews and logs.
+- Health checks and lightweight HTTP/SSE mocks for tests.
+- Optional telemetry (disabled by default) with minimal, non-PII counters.
+
+### Docs
+- User Guide: proxy usage examples, pinning policy, Windows guidance.
+- Troubleshooting: transport mismatch, pin override, rollback.
+- ADR-001: decision to adopt Supergateway and prefer Streamable HTTP.
+
+
 ### Fixed
 - Claude Code: use `~/.claude.json` on all platforms; add project-scoped MCP servers under `projects[<abs path>].mcpServers` so servers are active per project; adjust list/has to honor project scope.
 

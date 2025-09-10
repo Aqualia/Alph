@@ -1,4 +1,5 @@
 import { AgentProvider, AgentConfig, RemovalConfig } from '../agents/provider';
+import { redactForLogs } from './proxy';
 import { FileOperations } from './fileOps';
 
 function clone<T>(obj: T): T {
@@ -19,7 +20,7 @@ function redactValue(val: any): any {
 
 function redactObjectDeep(obj: any): any {
   if (obj === null || obj === undefined) return obj;
-  if (Array.isArray(obj)) return obj.map(redactObjectDeep);
+  if (Array.isArray(obj)) return obj.map(v => typeof v === 'string' ? redactForLogs(v) : redactObjectDeep(v));
   if (typeof obj === 'object') {
     const out: Record<string, any> = {};
     for (const [k, v] of Object.entries(obj)) {
@@ -28,7 +29,7 @@ function redactObjectDeep(obj: any): any {
       } else if (typeof v === 'object') {
         out[k] = redactObjectDeep(v);
       } else {
-        out[k] = v;
+        out[k] = typeof v === 'string' ? redactForLogs(v) : v;
       }
     }
     return out;

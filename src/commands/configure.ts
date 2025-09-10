@@ -52,6 +52,12 @@ export interface ConfigureCommandOptions {
   installManager?: 'npm' | 'brew' | 'pipx' | 'cargo' | 'auto';
   /** Quiet output (suppress info banners; show only final summary) */
   quiet?: boolean;
+
+  // Proxy flags (Codex bridging to remote via local STDIO proxy)
+  proxyRemoteUrl?: string;
+  proxyTransport?: 'http' | 'sse';
+  proxyBearer?: string;
+  proxyHeader?: string[]; // repeated "K: V"
 }
 
 /**
@@ -101,7 +107,11 @@ export class ConfigureCommand {
       backup: options.backup ?? true,
       noInstall: options.noInstall ?? (process.env['ALPH_NO_INSTALL'] === '1'),
       installManager: options.installManager ?? ((process.env['ALPH_INSTALL_MANAGER'] as any) || 'auto'),
-      quiet: options.quiet ?? false
+      quiet: options.quiet ?? false,
+      proxyRemoteUrl: options.proxyRemoteUrl,
+      proxyTransport: options.proxyTransport,
+      proxyBearer: options.proxyBearer,
+      proxyHeader: options.proxyHeader
     } as Required<ConfigureCommandOptions>;
   }
   
@@ -116,6 +126,7 @@ export class ConfigureCommand {
    */
   public async execute(): Promise<void> {
     this.validateOptions();
+    const start = Date.now();
     if (!this.options.quiet) {
       const { logger } = await import('../logger.js');
       logger.logStructured('info', { message: 'configure:start', context: { transport: this.options.transport, agents: this.options.agents } });
@@ -171,19 +182,38 @@ export class ConfigureCommand {
     }
 
     // 3) Build AgentConfig for providers
-    const transport = this.options.transport;
+    // Apply proxy flags when provided
+    let transport = this.options.transport;
+    let endpoint = this.options.mcpServerEndpoint;
+    let bearer = this.options.bearer;
+    let extraHeaders: Record<string, string> = {};
+    if (this.options.proxyRemoteUrl) {
+      endpoint = this.options.proxyRemoteUrl;
+      if (this.options.proxyTransport) transport = this.options.proxyTransport;
+      if (this.options.proxyBearer) bearer = this.options.proxyBearer;
+      if (Array.isArray(this.options.proxyHeader)) {
+        for (const h of this.options.proxyHeader) {
+          const idx = h.indexOf(':');
+          if (idx > 0) {
+            const k = h.slice(0, idx).trim();
+            const v = h.slice(idx + 1).trim();
+            if (k) extraHeaders[k] = v;
+          }
+        }
+      }
+    }
     // Apply default header policy if bearer present
-    const computedHeaders: Record<string, string> = { ...(this.options.headers || {}) };
-    if (this.options.bearer && (transport === 'http' || transport === 'sse')) {
+    const computedHeaders: Record<string, string> = { ...(this.options.headers || {}), ...extraHeaders };
+    if (bearer && (transport === 'http' || transport === 'sse')) {
       if (!computedHeaders['Authorization']) {
-        computedHeaders['Authorization'] = `Bearer ${this.options.bearer}`;
+        computedHeaders['Authorization'] = `Bearer ${bearer}`;
       }
     }
     
     const agentConfig: AgentConfig = {
-      mcpServerId: (this.options.name && this.options.name.trim()) || this.extractServerId(mcpConfig.httpUrl || ''),
-      mcpServerUrl: mcpConfig.httpUrl || '',
-      mcpAccessKey: this.options.bearer,
+      mcpServerId: (this.options.name && this.options.name.trim()) || this.extractServerId((endpoint || mcpConfig.httpUrl || '')),
+      mcpServerUrl: (endpoint || mcpConfig.httpUrl || ''),
+      mcpAccessKey: bearer,
       transport,
       headers: computedHeaders,
       env: this.options.env,
@@ -213,7 +243,8 @@ export class ConfigureCommand {
         const { computeInstallPreview } = await import('../utils/preview.js');
         console.log('\n[INFO] Preview of changes (redacted):');
         for (const p of detectedProviders) {
-          const preview = await computeInstallPreview(p, agentConfig);
+          const effectiveConfig = await this.__mapConfigForPreview(p.name, agentConfig);
+          const preview = await computeInstallPreview(p, effectiveConfig);
           if (!preview) continue;
           console.log(`\n— ${p.name} (${preview.configPath})`);
           console.log('Before (server snippet):');
@@ -233,7 +264,19 @@ export class ConfigureCommand {
     }
 
     // 6) Configure agents with rollback on any failure
-    await this.configureAgents(agentConfig, detectionResults);
+    try {
+      await this.configureAgents(agentConfig, detectionResults);
+      try {
+        const { telemetry } = await import('../utils/telemetry.js');
+        telemetry.recordConfigure(detectionResults.length, 0, Date.now() - start);
+      } catch {}
+    } catch (e) {
+      try {
+        const { telemetry } = await import('../utils/telemetry.js');
+        telemetry.recordConfigure(0, 1, Date.now() - start);
+      } catch {}
+      throw e;
+    }
   }
   
   /**
@@ -521,6 +564,36 @@ export class ConfigureCommand {
       { type: 'confirm', name: 'confirmed', message: 'Apply these changes?', default: true }
     ]);
     return confirmed;
+  }
+
+  // Provider-specific preview mapping: show Codex as STDIO via Supergateway when remote proxy flags are used
+  private async __mapConfigForPreview(providerName: string, config: AgentConfig): Promise<AgentConfig> {
+    if (providerName === 'Codex CLI' && (config.transport === 'http' || config.transport === 'sse')) {
+      const { buildSupergatewayArgs } = await import('../utils/proxy.js');
+      const headersRecord = config.headers || {};
+      let bearer = config.mcpAccessKey;
+      const authHeader = headersRecord['Authorization'] || (headersRecord as any)['authorization'];
+      if (!bearer && typeof authHeader === 'string') {
+        const m = authHeader.match(/Bearer\s+(.+)/i);
+        if (m) bearer = m[1];
+      }
+      const headers = Object.entries(headersRecord)
+        .filter(([k]) => k.toLowerCase() !== 'authorization')
+        .map(([key, value]) => ({ key, value: String(value) }));
+      const argv = buildSupergatewayArgs({
+        remoteUrl: config.mcpServerUrl || '',
+        transport: config.transport,
+        bearer,
+        headers,
+      });
+      return {
+        ...config,
+        transport: 'stdio',
+        command: 'npx',
+        args: ['-y', 'supergateway', ...argv],
+      };
+    }
+    return config;
   }
 }
 

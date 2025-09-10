@@ -3,7 +3,7 @@
 ```json
 {
   "id": "T0",
-  "title": "Author Decision Record: Adopt Supergateway + Streamable HTTP Preference",
+  "title": "✅ Author Decision Record: Adopt Supergateway + Streamable HTTP Preference",
   "description": "Create ADR-001 documenting the decision to adapt the MIT-licensed Supergateway as the bridging proxy (STDIO↔Streamable HTTP/SSE), pinning default version to 3.4.0 (rollback to stable 3.2.0 per release notes). Capture rationale, alternatives, risks, and upgrade policy. Include links and excerpts to the MCP transport spec indicating Streamable HTTP replaces HTTP+SSE, and to Supergateway releases and npm metadata for versioning and license.\nSources: GitHub README and releases (rollback rationale), npm package info, and MCP transport spec. :contentReference[oaicite:0]{index=0}",
   "dependencies": [],
   "acceptance_criteria": [
@@ -20,7 +20,7 @@
 ```json
 {
   "id": "T1",
-  "title": "Define Proxy Interfaces & Contracts (Spec for src/utils/proxy.ts)",
+  "title": "✅ Define Proxy Interfaces & Contracts (Spec for src/utils/proxy.ts)",
   "description": "Write a mini-spec (SPEC-ProxyArgs.md) defining ProxyOpts, buildSupergatewayArgs(), and redactForLogs() contracts: inputs, outputs, error handling, redaction semantics, and OS-agnostic argv rules. Include mapping for transport=http→--streamableHttp, transport=sse→--sse; bearer→--oauth2Bearer; arbitrary headers→repeated --header 'K: V'. Document that higher layers choose command ('npx' or 'docker'). Reference MCP Streamable HTTP as default and Supergateway CLI flags. :contentReference[oaicite:3]{index=3}",
   "dependencies": ["T0"],
   "acceptance_criteria": [
@@ -37,7 +37,7 @@
 ```json
 {
   "id": "T2",
-  "title": "Implement Proxy Argument Builder and Redaction Utility",
+  "title": "✅ Implement Proxy Argument Builder and Redaction Utility",
   "description": "Create src/utils/proxy.ts implementing buildSupergatewayArgs(opts: ProxyOpts): string[] and redactForLogs(x). Ensure no secret material is exposed via logs. Include exhaustive unit tests covering http vs sse, bearer vs headers, ordering, quoting, and redaction edge cases. Reference Alph’s redaction/preview policy from the hand-off brief. :contentReference[oaicite:5]{index=5}",
   "dependencies": ["T1"],
   "acceptance_criteria": [
@@ -55,7 +55,7 @@
 ```json
 {
   "id": "T3",
-  "title": "Add Tools Catalog Entry for Supergateway",
+  "title": "✅ Add Tools Catalog Entry for Supergateway",
   "description": "Update catalog/tools.yaml with id=mcp-proxy-supergateway. Define detect (`npx -y supergateway --version`), preWarm (`npx -y supergateway --help`), and optional health probes. Include version pinning affordance in detection (surface detected version). Ensure catalog entry adheres to the established playbook for STDIO tools (detect/install/health/pre-warm). :contentReference[oaicite:6]{index=6}",
   "dependencies": ["T0"],
   "acceptance_criteria": [
@@ -73,7 +73,7 @@
 ```json
 {
   "id": "T4",
-  "title": "Introduce `alph proxy` Command (run/health) as Thin Wrapper",
+  "title": "✅ Introduce `alph proxy` Command (run/health) as Thin Wrapper",
   "description": "Create src/commands/proxy.ts with two subcommands: `alph proxy run` to spawn the proxy and stream logs (with redaction) and `alph proxy health` to perform a lightweight connectivity probe (no config writes). Must use argv arrays (no shell) and support `--remote-url`, `--transport (http|sse)`, `--bearer`, repeated `--header`, `--proxy-version`, and optional `--docker`. Reference MCP transport defaults and Supergateway flags. :contentReference[oaicite:8]{index=8}",
   "dependencies": ["T2"],
   "acceptance_criteria": [
@@ -109,7 +109,7 @@
 ```json
 {
   "id": "T6",
-  "title": "Non-Interactive Flags & AgentConfig Transform",
+  "title": "✅ Non-Interactive Flags & AgentConfig Transform",
   "description": "Extend src/commands/configure.ts to accept `--proxy-remote-url`, `--proxy-transport`, `--proxy-bearer`, and `--proxy-header`. When agent=Codex and transport is http|sse, transform AgentConfig to STDIO by composing `command='npx'` and args via buildSupergatewayArgs(); apply startup_timeout_ms=60000 for generic runners if not set; proceed through preview→confirm→atomic write + backup→validate/rollback. :contentReference[oaicite:11]{index=11}",
   "dependencies": ["T2"],
   "acceptance_criteria": [
@@ -126,7 +126,7 @@
 ```json
 {
   "id": "T7",
-  "title": "Provider Compatibility Verification for Codex (STDIO-only)",
+  "title": "✅ Provider Compatibility Verification for Codex (STDIO-only)",
   "description": "Validate that Codex provider behavior remains unchanged: it rejects HTTP/SSE and accepts STDIO entries that spawn Supergateway. Confirm TOML location/shape and heuristic timeout behavior. :contentReference[oaicite:14]{index=14}",
   "dependencies": ["T6"],
   "acceptance_criteria": [
@@ -143,7 +143,7 @@
 ```json
 {
   "id": "T8",
-  "title": "Security & Redaction Validation",
+  "title": "✅ Security & Redaction Validation",
   "description": "Systematically verify that tokens and sensitive header values are redacted in previews, logs, and error messages across CLI (`alph proxy`), interactive wizard, and configure flows. Align with brief’s redaction guidance. :contentReference[oaicite:16]{index=16}",
   "dependencies": ["T4", "T5", "T6"],
   "acceptance_criteria": [
@@ -160,7 +160,7 @@
 ```json
 {
   "id": "T9",
-  "title": "Windows Reliability: Pre-warm & Timeout Heuristic",
+  "title": "✅ Windows Reliability: Pre-warm & Timeout Heuristic",
   "description": "On Windows runners, validate first-run reliability: ensure `npx supergateway --help` pre-warm occurs in wizard and that codex TOML includes `startup_timeout_ms=60000` when unset. Verify atomic/backup behavior on NTFS. :contentReference[oaicite:17]{index=17}",
   "dependencies": ["T5", "T6"],
   "acceptance_criteria": [
@@ -177,7 +177,7 @@
 ```json
 {
   "id": "T10",
-  "title": "Linux Compatibility: Spawn Semantics & File Safety",
+  "title": "✅ Linux Compatibility: Spawn Semantics & File Safety",
   "description": "Verify Linux behavior: argv-only spawn (no shell), correct environment propagation for bearer via args, and atomic writes on ext4. Confirm `alph proxy` run/health behavior and no dependency on TTY. Cite MCP transport notes for expected HTTP behavior. :contentReference[oaicite:20]{index=20}",
   "dependencies": ["T4", "T6"],
   "acceptance_criteria": [
@@ -279,7 +279,7 @@
 ```json
 {
   "id": "T16",
-  "title": "Atomic Write + Backup + Rollback Drills",
+  "title": "✅ Atomic Write + Backup + Rollback Drills",
   "description": "Create automated drills verifying that provider writes use temp-file→rename, backups are timestamped, and rollback restores the last good state upon validation failure. Use Codex provider path and induced TOML syntax errors to exercise rollback. :contentReference[oaicite:28]{index=28}",
   "dependencies": ["T6"],
   "acceptance_criteria": [
@@ -296,7 +296,7 @@
 ```json
 {
   "id": "T17",
-  "title": "Telemetry (Minimal & Non-PII) for Configure Success/Failure",
+  "title": "✅ Telemetry (Minimal & Non-PII) for Configure Success/Failure",
   "description": "Add optional, opt-in counters for proxy configuration success/failure. No PII or secret content. Ensure metrics can be disabled via flag/env and default to off.",
   "dependencies": ["T6", "T13"],
   "acceptance_criteria": [
@@ -313,7 +313,7 @@
 ```json
 {
   "id": "T18",
-  "title": "Documentation: User Guide & Troubleshooting",
+  "title": "✅ Documentation: User Guide & Troubleshooting",
   "description": "Update user docs to include: why a local proxy is needed for Codex (STDIO-only), Streamable HTTP as the recommended transport, SSE fallback, Windows pre-warm guidance, version pinning policy, and rollback troubleshooting. Cite spec and releases. :contentReference[oaicite:29]{index=29} :contentReference[oaicite:30]{index=30}",
   "dependencies": ["T5", "T6", "T15"],
   "acceptance_criteria": [
@@ -330,7 +330,7 @@
 ```json
 {
   "id": "T19",
-  "title": "Release Checklist & Notes",
+  "title": "✅ Release Checklist & Notes",
   "description": "Prepare release notes summarizing new proxy capability, OS coverage, default pin (3.4.0) and override, and guidance to prefer Streamable HTTP. Include links to MCP spec and Supergateway releases. Provide a QA sign-off checklist referencing T13 and T16 outcomes. :contentReference[oaicite:31]{index=31}",
   "dependencies": ["T13", "T15", "T18"],
   "acceptance_criteria": [
@@ -347,7 +347,7 @@
 ```json
 {
   "id": "T20",
-  "title": "Post-Release Monitoring & Support Playbook",
+  "title": "✅ Post-Release Monitoring & Support Playbook",
   "description": "Create a support runbook for common issues (first-run latency, wrong transport selection, invalid headers). Include triage steps, known fixes (pre-warm, timeout adjustment), and version override instructions. Reference troubleshooting content and brief heuristics. :contentReference[oaicite:32]{index=32}",
   "dependencies": ["T18", "T19"],
   "acceptance_criteria": [

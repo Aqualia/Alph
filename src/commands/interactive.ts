@@ -86,6 +86,17 @@ export class InteractiveConfigurator {
       return;
     }
     
+    // Optional pre-warm for Supergateway to reduce first-run latency (Windows/Linux/macOS)
+    try {
+      if (selectedAgents.includes('Codex CLI') && mcpConfig.transport !== 'stdio') {
+        console.log('\n[INFO] Pre-warming local proxy (supergateway) ...');
+        const { execSync } = await import('child_process');
+        execSync('npx -y supergateway --help', { stdio: 'ignore' });
+      }
+    } catch {
+      // non-fatal; continue
+    }
+
     // 5. Apply configuration
     await this.applyConfiguration(selectedAgents, mcpConfig, configDirChoice.configDir, backupPref);
   }

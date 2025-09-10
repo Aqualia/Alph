@@ -10,6 +10,28 @@ This document provides solutions to common issues you may encounter while using 
 - [Platform-Specific Issues](#platform-specific-issues)
 - [Getting Help](#getting-help)
 
+## Codex & Proxy Integration
+
+- Codex requires a local STDIO proxy for remote servers
+  - Symptom: HTTP/SSE entries are ignored by Codex.
+  - Fix: Use proxy flags: `--proxy-transport http|sse` and `--proxy-remote-url <URL>`. Alph writes a STDIO entry that runs Supergateway.
+
+- First-run latency with `npx`
+  - Symptom: Timeout on first proxy launch.
+  - Fix: Alph pre-warms `npx -y supergateway --help` and sets `startup_timeout_ms = 60000` for generic runners unless customized.
+
+- Transport mismatch (SSE vs HTTP)
+  - Symptom: Connection opens but streaming fails or hangs.
+  - Fix: Prefer Streamable HTTP; use `--proxy-transport http` unless server is SSE-only.
+
+- Version pinning
+  - Symptom: Regression with newer proxy release.
+  - Fix: Set `ALPH_PROXY_VERSION=<version>` or pass `--proxy-version <version>`.
+
+- Rollback and backups
+  - Symptom: Corrupted or invalid TOML.
+  - Fix: Alph writes atomically with a timestamped backup and rolls back on validation failure. See `npm run drills:rollback`.
+
 ## Installation Issues
 
 ### "Command not found" after installation

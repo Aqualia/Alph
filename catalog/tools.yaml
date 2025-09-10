@@ -81,3 +81,24 @@ tools:
       probe:   { command: "playwright-mcp --help" }
     meta:
       notes: "Headless browser automation via Playwright."
+
+  - id: "mcp-proxy-supergateway"
+    bin: "npx"
+    discovery:
+      commands: ["npx -y supergateway --version"]
+    installers:
+      macos:
+        - type: npm
+          command: "npm i -g supergateway@3.4.0"
+      linux:
+        - type: npm
+          command: "npm i -g supergateway@3.4.0"
+      windows:
+        - type: npm
+          command: "npm i -g supergateway@3.4.0"
+    health:
+      version: { command: "npx -y supergateway --version" }
+      preWarm: { command: "npx -y supergateway --help" }
+      probeHttp: { command: "npx -y supergateway --streamableHttp https://example.invalid --help" }
+    meta:
+      notes: "STDIO ↔ Streamable HTTP/SSE proxy. Default pin: v3.4.0 (rollback to 3.2.0 behavior). Override with --proxy-version if needed."
