@@ -41,6 +41,24 @@ sudo chown -R $(whoami) $(npm config get prefix)/{lib/node_modules,bin,share}
 npm config set prefix ~/.local
 export PATH="$PATH:~/.local/bin"
 
+## Codex CLI doesn’t see my STDIO MCP server
+
+Symptoms:
+- You added an `[mcp_servers.<name>]` entry in `~/.codex/config.toml`, but tools don’t appear or the server seems to never start.
+
+Common causes and fixes:
+- First‑run timeouts with `npx`/`yarn dlx`/`pnpm dlx`:
+  - On first run these commands may download packages, exceeding Codex’s 10s default. Alph now pre‑warms such invocations and sets `startup_timeout_ms = 60000` automatically. If you customized timeouts earlier, increase them to at least 60000.
+- Package not present on PATH when using a dedicated binary:
+  - Use Alph’s installer flow or install the tool globally (e.g., `npm i -g <pkg>`), then re‑run Alph.
+- Invalid TOML shape:
+  - Ensure the top‑level key is `mcp_servers` (not `mcpServers`) per Codex docs.
+
+Manual refresh tip:
+- Codex lazily starts MCP servers. Triggering a tool that uses the server forces a launch; restarting Codex also reloads config.
+
+---
+
 # Option 3: Use npx (no global install)
 npx --yes -p @aqualia/alph-cli alph setup --mcp-server-endpoint https://askhuman.net/mcp/ID --bearer KEY -y
 ```

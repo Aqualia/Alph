@@ -1,0 +1,9 @@
+    agents.forEach(agent => console.log(`  • ${agent}`));
+    
+    console.log('\n🌐 MCP Server Configuration:');
+    console.log(`  • Name: ${mcpConfig.name}`);
+    console.log(`  • Endpoint: ${mcpConfig.httpUrl}`);
+    console.log(`  • Transport: ${mcpConfig.transport}`);
+    if (this.options.bearer) {
+      const token = this.options.bearer;
+      const last4 = token.slice(-4);

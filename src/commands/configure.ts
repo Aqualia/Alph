@@ -485,6 +485,8 @@ export class ConfigureCommand {
     console.log('Agents to configure:');
     providers.forEach(p => console.log(`  • ${p}`));
     console.log('\nMCP server:');
+    const endpointDisplay = (agentConfig.transport === 'stdio') ? 'Local (STDIO)' : (agentConfig.mcpServerUrl || '');
+    console.log(`  Endpoint: ${endpointDisplay}`);
     console.log(`  • ID: ${agentConfig.mcpServerId}`);
     console.log(`  • URL: ${agentConfig.mcpServerUrl}`);
     console.log(`  • Transport: ${agentConfig.transport}`);
@@ -500,6 +502,8 @@ export class ConfigureCommand {
     console.log('The following agents will be configured:');
     providers.forEach(p => console.log(`  • ${p}`));
     console.log('\nMCP Server Configuration:');
+    const endpointDisplay2 = (agentConfig.transport === 'stdio') ? 'Local (STDIO)' : (agentConfig.mcpServerUrl || '');
+    console.log(`  Endpoint: ${endpointDisplay2}`);
     console.log(`  • ID: ${agentConfig.mcpServerId}`);
     console.log(`  • Endpoint: ${agentConfig.mcpServerUrl}`);
     console.log(`  • Transport: ${agentConfig.transport}`);

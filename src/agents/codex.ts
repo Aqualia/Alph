@@ -101,6 +101,16 @@ export class CodexProvider implements AgentProvider {
     if (config.args && config.args.length > 0) entry.args = config.args;
     if (config.env && Object.keys(config.env).length > 0) entry.env = config.env;
     if (typeof config.timeout === 'number' && config.timeout > 0) entry.startup_timeout_ms = config.timeout;
+
+    // Heuristic: npx/yarn dlx/pnpm dlx may need extra time on first run
+    const cmd = (config.command || '').toLowerCase();
+    const firstArg = (config.args && config.args[0] || '').toLowerCase();
+    const isNPX = cmd.endsWith('npx') || cmd.endsWith('npx.cmd');
+    const isDLX = (cmd === 'yarn' || cmd.endsWith('yarn.cmd') || cmd === 'pnpm' || cmd.endsWith('pnpm.cmd')) && firstArg === 'dlx';
+    if ((isNPX || isDLX) && (entry.startup_timeout_ms === undefined || entry.startup_timeout_ms < 60000)) {
+      // Default to 60s if not explicitly set (Codex default is 10s)
+      entry.startup_timeout_ms = 60000;
+    }
     servers[config.mcpServerId] = entry;
 
     next.mcp_servers = servers;

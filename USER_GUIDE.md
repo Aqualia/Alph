@@ -172,7 +172,10 @@ startup_timeout_ms = 20000  # optional
 ```
 Notes:
 - Codex currently reads MCP servers from `mcp_servers` in TOML and launches processes via STDIO only.
-- Alph’s wizard automatically limits transport to STDIO when Codex is selected and skips remote URL prompts.
+- Alph's wizard automatically limits transport to STDIO when Codex is selected and skips remote URL prompts.
+ - First-run of generic runners like `npx`/`yarn dlx`/`pnpm dlx` can take longer than Codex’s default 10s timeout due to dependency download. Alph now:
+   - Pre‑warms these invocations during interactive setup (runs `--help` once to cache).
+   - Sets a safer default `startup_timeout_ms = 60000` for such commands unless you specify a custom timeout.
 
 ## Common Use Cases
 

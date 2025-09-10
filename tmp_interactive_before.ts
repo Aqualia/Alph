@@ -5,6 +5,7 @@ import { execSync } from 'child_process';
 import { ConfigureCommand, ConfigureCommandOptions } from './configure';
 import { MCPServerConfig } from '../types/config';
 import { mapAliases, parseAgentNames, validateAgentNames } from '../utils/agents';
+import AgentSelector from '../components/AgentSelector';
 import { existsSync, statSync } from 'fs';
 import { getInquirer } from '../utils/inquirer';
 
@@ -49,27 +50,27 @@ export class InteractiveConfigurator {
         selectedAgents = await this.selectAgents(detectedAgents);
       } else {
         console.log('\nUsing pre-selected agents:');
-        selectedAgents.forEach(a => console.log(`  \u0007 ${a}`));
+        selectedAgents.forEach(a => console.log(`  • ${a}`));
       }
     } else {
       selectedAgents = await this.selectAgents(detectedAgents);
     }
     if (selectedAgents.length === 0) {
-      console.log('\n? No agents selected. Exiting.');
+      console.log('\n❌ No agents selected. Exiting.');
       return;
     }
     
     // 3. Get MCP server configuration (supports pre-filled endpoint & access key)
     const mcpConfig = await this.getMCPConfig(selectedAgents);
     if (!mcpConfig) {
-      console.log('\n? Configuration aborted.');
+      console.log('\n❌ Configuration aborted.');
       return;
     }
 
     // 3.5. Ask about config directory preference
     const configDirChoice = await this.getConfigDirectoryChoice();
     if (configDirChoice.cancelled) {
-      console.log('\n? Configuration cancelled.');
+      console.log('\n❌ Configuration cancelled.');
       return;
     }
     
@@ -79,7 +80,7 @@ export class InteractiveConfigurator {
     // 4. Confirm configuration
     const confirmed = await this.confirmConfiguration(selectedAgents, mcpConfig, backupPref);
     if (!confirmed) {
-      console.log('\n? Configuration cancelled.');
+      console.log('\n❌ Configuration cancelled.');
       return;
     }
     
@@ -93,8 +94,8 @@ export class InteractiveConfigurator {
   private async showWelcomeMessage(): Promise<void> {
     const { showMainBanner } = await import('../utils/banner.js');
     await showMainBanner();
-    console.log('?? Welcome to the Alph Configuration Wizard');
-    console.log('�'.repeat(42));
+    console.log('🚀 Welcome to the Alph Configuration Wizard');
+    console.log('─'.repeat(42));
     console.log('Configure your AI agents to work with MCP servers');
     console.log();
   }
@@ -103,7 +104,7 @@ export class InteractiveConfigurator {
    * Detects available agents on the system
    */
   private async detectAgents(): Promise<string[]> {
-    console.log('?? Detecting available AI agents...');
+    console.log('🔍 Detecting available AI agents...');
     
     const detectionResults = await defaultRegistry.detectAvailableAgents();
     const detectionSummary = defaultRegistry.summarizeDetectionResults(detectionResults);
@@ -112,113 +113,180 @@ export class InteractiveConfigurator {
       return [];
     }
     
-    console.log(`\n? Found ${detectionSummary.detected} AI agent(s):`);
+    console.log(`\n✅ Found ${detectionSummary.detected} AI agent(s):`);
     detectionSummary.detectedProviders.forEach(provider => {
-      console.log(`  \u0007 ${provider}`);
+      console.log(`  • ${provider}`);
     });
     
     // Only show failed detections if there are any, but don't include them in the return
     if (detectionSummary.failed > 0) {
-      console.log(`\n??  ${detectionSummary.failed} agent(s) could not be detected:`);
+      console.log(`\n⚠️  ${detectionSummary.failed} agent(s) could not be detected:`);
       const failedDetections = defaultRegistry.getFailedDetections(detectionResults);
       failedDetections.forEach(failed => {
-        console.log(`  \u0007 ${failed.provider.name}: ${failed.error || 'Detection failed'}`);
+        console.log(`  • ${failed.provider.name}: ${failed.error || 'Detection failed'}`);
       });
     }
-
+    
+    // Return only the successfully detected agents
     return detectionSummary.detectedProviders;
   }
   
   /**
-   * Shows a helpful message when no agents are detected
+   * Handles case when no agents are detected
    */
   private showNoAgentsDetected(): void {
-    console.log('\n? No supported AI agents detected on this system.');
-    console.log('\nSupported agents and their default locations:');
-    console.log('  \u0007 Gemini CLI: ~/.gemini/settings.json');
-    console.log('  \u0007 Cursor: Platform-specific configuration');
-    console.log('  \u0007 Claude Code: Platform-specific configuration');
-    console.log('  \u0007 Codex CLI: ~/.codex/config.toml');
-    console.log('\nPlease install at least one supported AI agent and try again.');
+    console.log('\n🔍 No Supported AI Agents Detected');
+    console.log('='.repeat(40));
+    console.log('We couldn\'t detect any supported AI agents on your system.');
+    console.log('\n📋 Supported agents and their default locations:');
+    console.log('  • Gemini CLI: ~/.gemini/settings.json');
+    console.log('  • Cursor: Platform-specific configuration');
+    console.log('  • Claude Code: Platform-specific configuration');
+    console.log('  • Codex CLI: ~/.codex/config.toml');
+    console.log('\n💡 To proceed, please:');
+    console.log('   1. Install one of the supported AI agents listed above');
+    console.log('   2. Ensure the agent is properly configured');
+    console.log('   3. Re-run this configuration wizard');
+    console.log('\nFor installation instructions, visit: https://github.com/Aqualia/Alph#installation');
   }
   
   /**
-   * Prompts the user to select agents
+   * Gets a description for an agent
    */
-  private async selectAgents(detectedAgents: string[]): Promise<string[]> {
-    const inquirer = await getInquirer();
-    const { selected } = await inquirer.prompt([
-      {
-        type: 'checkbox',
-        name: 'selected',
-        message: 'Select which agents to configure:',
-        choices: detectedAgents.map(a => ({ name: a, value: a, checked: true })),
-        pageSize: Math.min(10, detectedAgents.length),
-        prefix: '?? '
+  private getAgentDescription(agent: string): string {
+    const key = (agent || '').trim().toLowerCase();
+    const descMap: Record<string, string> = {
+      // Exact provider names
+      'gemini cli': 'Google Gemini CLI — Command‑line access to Gemini models for coding, reasoning, and web tasks',
+      'cursor': 'Cursor IDE — AI‑powered code editor with inline assistance and automations',
+      'claude code': 'Claude Code — Anthropic’s coding assistant for generating, explaining, and refactoring code',
+      'windsurf': 'Windsurf (Codeium) — AI IDE with MCP integration for custom tools',
+      'codex cli': 'OpenAI Codex CLI — Terminal coding assistant; MCP via STDIO (TOML at ~/.codex/config.toml)',
+      'warp': 'Warp Terminal — AI‑assisted terminal with MCP server support',
+      // Common aliases
+      'gemini': 'Google Gemini CLI — Command‑line access to Gemini models for coding, reasoning, and web tasks',
+      'claude': 'Claude Code — Anthropic’s coding assistant for generating, explaining, and refactoring code',
+      'codex': 'OpenAI Codex CLI — Terminal coding assistant; MCP via STDIO (TOML at ~/.codex/config.toml)',
+      'codeium-windsurf': 'Windsurf (Codeium) — AI IDE with MCP integration for custom tools',
+      'warp-terminal': 'Warp Terminal — AI‑assisted terminal with MCP server support'
+    };
+    return descMap[key] || 'AI agent with MCP server integration support';
+  }
+  
+  /**
+   * Prompts the user to select which agent to configure (one at a time)
+   */
+  private async selectAgents(availableAgents: string[]): Promise<string[]> {
+    // Prefill from CLI-provided agents if present
+    let prefill: string | undefined;
+    if (this.options.agents) {
+      const requested = mapAliases(parseAgentNames(this.options.agents));
+      const { valid } = validateAgentNames(requested);
+      // Intersect with available and take first
+      const matched = valid.filter(v => availableAgents.includes(v));
+      if (matched.length > 0) {
+        prefill = matched[0]; // fallback to first available
       }
-    ]);
-    if (!Array.isArray(selected) || selected.length === 0) return [];
-    return selected as string[];
+    }
+
+    const selectedAgent = await AgentSelector({
+      message: 'Select an agent to configure:',
+      choices: availableAgents.map(agent => ({
+        name: agent,
+        value: agent,
+        description: this.getAgentDescription(agent)
+      })),
+      default: prefill || availableAgents[0]
+    });
+    
+    return [selectedAgent];
   }
   
   /**
-   * Gets MCP server configuration from user inputs
+   * Gets MCP server configuration through interactive prompts
    */
-  private async getMCPConfig(selectedAgents: string[]): Promise<MCPServerConfig | null> {
-    const supportsBearer = true; // generic prompt for bearer across HTTP/SSE
-    const inquirer = await getInquirer();
+  private async getMCPConfig(selectedAgents?: string[]): Promise<MCPServerConfig | null> {
+    console.log('\n🌐 MCP Server Configuration');
+    console.log('='.repeat(50));
+    console.log('Configure your Model Context Protocol (MCP) server connection.');
+    console.log('This will enable your AI agents to communicate with your MCP server.\n');
+    const includesCodex = Array.isArray(selectedAgents) && selectedAgents.includes('Codex CLI');
     
+    if (includesCodex) {
+      console.log('ℹ️  Codex CLI: Remote HTTP/SSE MCP servers are not supported.');
+      console.log('   We will configure a local STDIO MCP server (command + args).');
+    }
     const prompts: any[] = [
       {
         type: 'input',
         name: 'name',
-        message: 'Give this MCP configuration a name:',
-        default: 'default-server',
-        prefix: '?? ',
-        validate: (s: string) => !!s && /[A-Za-z0-9-_]/.test(s) || 'Name cannot be empty.'
+        message: 'Configuration Name:',
+        default: 'my-mcp-server',
+        prefix: '🏷️ '
       },
+      // URL prompt is conditionally included
+      ...(!this.options.mcpServerEndpoint && !includesCodex
+        ? [{
+            type: 'input',
+            name: 'httpUrl',
+            message: 'MCP Server Endpoint URL:',
+            default: 'https://',
+            prefix: '🔗 ',
+            validate: (input: string) => {
+              if (!input) return 'URL is required.';
+              // Automatically add https:// prefix if missing
+              let urlToTest = input;
+              if (!input.startsWith('http://') && !input.startsWith('https://')) {
+                urlToTest = `https://${input}`;
+              }
+              try { new URL(urlToTest); return true; } catch { return 'Please enter a valid URL.'; }
+            },
+            transformer: (input: string) => {
+              // Add https:// prefix if missing when user starts typing
+              if (input && !input.startsWith('http://') && !input.startsWith('https://')) {
+                return `https://${input}`;
+              }
+              return input;
+            }
+          }]
+        : []),
       {
         type: 'list',
         name: 'transport',
-        message: 'How do you want to connect to the MCP server?',
-        choices: [
-          { name: 'Local tool (STDIO)', value: 'stdio' },
-          { name: 'Remote over HTTP', value: 'http' },
-          { name: 'Remote over SSE', value: 'sse' }
-        ],
-        default: (Array.isArray(selectedAgents) && selectedAgents.includes('Codex CLI')) ? 'stdio' : 'http',
-        prefix: '?? '
+        message: 'Transport Protocol:',
+        prefix: '📡 ',
+        choices: includesCodex
+          ? [ { name: 'STDIO (Local command)', value: 'stdio' } ]
+          : [
+              { name: 'HTTP (Standard)', value: 'http' },
+              { name: 'SSE (Server-Sent Events)', value: 'sse' },
+              { name: 'STDIO (Local command)', value: 'stdio' }
+            ],
+        // Default transport
+        default: includesCodex ? 'stdio' : (this.options.transport || 'http')
       },
-      {
-        type: 'input',
-        name: 'httpUrl',
-        message: 'Enter the MCP server endpoint URL:',
-        when: (ans: any) => ans.transport !== 'stdio',
-        prefix: '?? ',
-        validate: (input: string) => {
-          try { new URL(input); return true; } catch { return 'Please enter a valid URL.'; }
-        }
-      },
-      ...(supportsBearer
+      // Authentication token prompt is conditionally included; input masked
+      ...(!this.options.bearer && !includesCodex
         ? [{
             type: 'password',
             name: 'bearer',
             message: 'Authentication Token (Optional):',
-            prefix: '?? ',
+            prefix: '🔑 ',
             mask: '*',
             validate: () => true,
             suffix: ' (Leave blank for public servers)'
           }]
         : [])
     ];
-    
+
+    const inquirer = await getInquirer();
     const answers = await inquirer.prompt(prompts);
-    
+
     // If user provided a bearer token interactively, store it for later application
     if (!this.options.bearer && answers['bearer']) {
       this.options.bearer = answers['bearer'];
     }
-    
+
     if (answers['transport'] === 'stdio') {
       // STDIO flow: pick tool, ensure installed, health check, set command/args
       const { loadToolsCatalog, detectTool, installTool, runHealthCheck, chooseDefaultInvocation } = await import('../utils/tools.js');
@@ -226,7 +294,7 @@ export class InteractiveConfigurator {
       if (!catalog.tools || catalog.tools.length === 0) {
         throw new Error('No STDIO tools found in catalog');
       }
-      const customChoice = { name: 'Custom command.', value: '__custom__' } as const;
+      const customChoice = { name: 'Custom command…', value: '__custom__' } as const;
       // Deduplicate tools by id
       const uniqueIds = new Set<string>();
       const uniqueTools = catalog.tools.filter(t => {
@@ -242,12 +310,12 @@ export class InteractiveConfigurator {
         message: 'Select a local MCP server tool to use:',
         choices: toolChoices,
         default: (Array.isArray(selectedAgents) && selectedAgents.includes('Codex CLI')) ? customChoice.value : (toolChoices[0]?.value ?? customChoice.value),
-        prefix: '?? '
+        prefix: '🧰 '
       });
       if (toolId === '__custom__') {
         const custom = await inquirer.prompt([
-          { type: 'input', name: 'cmd', message: 'Command (e.g., npx):', prefix: '?? ', validate: (s: string) => !!s || 'Command is required.' },
-          { type: 'input', name: 'args', message: 'Arguments (comma or space separated):', prefix: '? ', default: '' }
+          { type: 'input', name: 'cmd', message: 'Command (e.g., npx):', prefix: '💻 ', validate: (s: string) => !!s || 'Command is required.' },
+          { type: 'input', name: 'args', message: 'Arguments (comma or space separated):', prefix: '➕ ', default: '' }
         ]);
         const args = (custom.args as string)
           .split(/[\s,]+/)
@@ -262,13 +330,13 @@ export class InteractiveConfigurator {
           autoApprove: []
         };
       }
-      
+
       const tool = catalog.tools.find(t => t.id === toolId)!;
       let det = detectTool(tool);
       if (!det.installed) {
         const optOut = (this.options as any)['noInstall'] === true || process.env['ALPH_NO_INSTALL'] === '1';
         if (optOut) {
-          console.log('\n??  STDIO tool not found and installation is disabled (--no-install or ALPH_NO_INSTALL=1).');
+          console.log('\n⚠️  STDIO tool not found and installation is disabled (--no-install or ALPH_NO_INSTALL=1).');
           throw new Error('Aborting: STDIO tool is not installed. Re-run without --no-install to install automatically.');
         }
         await installTool(tool, (this.options as any)['installManager']);
@@ -282,8 +350,8 @@ export class InteractiveConfigurator {
       const { customize } = await inquirer.prompt({ type: 'confirm', name: 'customize', message: 'Customize command/args?', default: (Array.isArray(selectedAgents) && selectedAgents.includes('Codex CLI')) });
       if (customize) {
         const edited = await inquirer.prompt([
-          { type: 'input', name: 'cmd', message: 'Command:', prefix: '?? ', default: invoke.command, validate: (s: string) => !!s || 'Command is required.' },
-          { type: 'input', name: 'args', message: 'Arguments (comma or space separated):', prefix: '? ', default: (invoke.args || []).join(' ') }
+          { type: 'input', name: 'cmd', message: 'Command:', prefix: '💻 ', default: invoke.command, validate: (s: string) => !!s || 'Command is required.' },
+          { type: 'input', name: 'args', message: 'Arguments (comma or space separated):', prefix: '➕ ', default: (invoke.args || []).join(' ') }
         ]);
         const args = (edited.args as string)
           .split(/[\s,]+/)
@@ -380,7 +448,7 @@ export class InteractiveConfigurator {
       };
     }
   }
-  
+
   /**
    * Gets user preference for config directory location
    */
@@ -391,12 +459,12 @@ export class InteractiveConfigurator {
       name: 'choice',
       message: 'Where would you like to store the MCP server configuration?',
       choices: [
-        { name: '?? Global (default agent config locations)', value: 'global' },
-        { name: '?? Project-specific directory', value: 'project' }
+        { name: '🌍 Global (default agent config locations)', value: 'global' },
+        { name: '📁 Project-specific directory', value: 'project' }
       ],
       default: 'global'
     });
-    
+
     if (choice === 'project') {
       const { customDir } = await inquirer.prompt({
         type: 'input',
@@ -418,10 +486,10 @@ export class InteractiveConfigurator {
       });
       return { configDir: customDir, cancelled: false };
     }
-    
+
     return { cancelled: false };
   }
-  
+
   /**
    * Prompt for backup preference
    */
@@ -444,28 +512,27 @@ export class InteractiveConfigurator {
     mcpConfig: MCPServerConfig,
     backup: boolean
   ): Promise<boolean> {
-    console.log('\n?? Configuration Summary');
+    console.log('\n📋 Configuration Summary');
     console.log('='.repeat(50));
     console.log('Review your settings before applying changes:');
     
-    console.log('\n?? Selected AI Agents:');
-    agents.forEach(agent => console.log(`  \u0007 ${agent}`));
+    console.log('\n🤖 Selected AI Agents:');
+    agents.forEach(agent => console.log(`  • ${agent}`));
     
-    console.log('\n?? MCP Server Configuration:');
-    console.log(`  \u0007 Name: ${mcpConfig.name}`);
-    const endpointDisplay = mcpConfig.transport === 'stdio' ? 'Local (STDIO)' : (mcpConfig.httpUrl || '');
-    console.log(`  \u0007 Endpoint: ${endpointDisplay}`);
-    console.log(`  \u0007 Transport: ${mcpConfig.transport}`);
+    console.log('\n🌐 MCP Server Configuration:');
+    console.log(`  • Name: ${mcpConfig.name}`);
+    console.log(`  • Endpoint: ${mcpConfig.httpUrl}`);
+    console.log(`  • Transport: ${mcpConfig.transport}`);
     if (this.options.bearer) {
       const token = this.options.bearer;
       const last4 = token.slice(-4);
-      console.log(`  \u0007 Authentication Token: ****${last4} (redacted)`);
+      console.log(`  • Authentication Token: ****${last4} (redacted)`);
     }
     
     // Configuration details
-    console.log('\n?? Configuration Details:');
-    console.log('  \u0007 Changes are atomic with automatic rollback support');
-    console.log(`  \u0007 Backups: ${backup ? 'Enabled' : 'Disabled'}`);
+    console.log('\n📋 Configuration Details:');
+    console.log('  • Changes are atomic with automatic rollback support');
+    console.log(`  • Backups: ${backup ? 'Enabled' : 'Disabled'}`);
     
     const inquirer = await getInquirer();
     const { confirmed } = await inquirer.prompt({
@@ -487,7 +554,7 @@ private async applyConfiguration(
   configDir?: string,
   backup?: boolean
 ): Promise<void> {
-console.log('\n?? Applying configuration...');
+console.log('\n🔄 Applying configuration...');
 // Default transport
   let transport = mcpConfig.transport || 'http';
   
@@ -532,7 +599,7 @@ options: ConfigureCommandOptions = {}
 ): Promise<void> {
   // Set up graceful exit handling
   const handleExit = () => {
-    console.log('\n\n?? Setup cancelled. Goodbye!');
+    console.log('\n\n👋 Setup cancelled. Goodbye!');
     process.exit(0);
   };
 
@@ -550,11 +617,11 @@ options: ConfigureCommandOptions = {}
       error.message.includes('canceled') ||
       error.message.includes('cancelled')
     )) {
-      console.log('\n\n?? Setup cancelled. Goodbye!');
+      console.log('\n\n👋 Setup cancelled. Goodbye!');
       process.exit(0);
     }
 
-    console.error('\n? Error during interactive configuration:');
+    console.error('\n❌ Error during interactive configuration:');
     console.error(error instanceof Error ? error.message : 'Unknown error');
 
     // Re-throw so integration tests and callers can handle failures
@@ -565,3 +632,4 @@ options: ConfigureCommandOptions = {}
     process.removeListener('SIGTERM', handleExit);
   }
 }
+
